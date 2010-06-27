@@ -56,7 +56,7 @@ Each combinator therein takes an extra argument that is used to speculate on the
 
 Given a valid estimator `g`, `'foldr g f z xs` yields the same answer as `Foldable.foldr' f z xs`.
 
-`g n` should supply an estimate of the value returned from folding over the /last/ `n` elements of the container.
+`g n` should supply an estimate of the value returned from folding over the **last** `n` elements of the container.
 
 As with `spec`, if the guess `g n` is accurate a reasonable percentage of the time and faster to compute than the fold, then this can provide increased opportunities for parallelism.
 
@@ -64,7 +64,7 @@ As with `spec`, if the guess `g n` is accurate a reasonable percentage of the ti
 
     foldl :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 
-`foldl` works similarly to `Foldable.foldl'`, except that `g n` should provide an estimate for the /first/ `n` elements.
+`foldl` works similarly to `Foldable.foldl'`, except that `g n` should provide an estimate for the **first** `n` elements.
 
 contact information
 -------------------

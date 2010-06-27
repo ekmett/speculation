@@ -10,7 +10,8 @@ You can download it using 'cabal install speculation', if you have the Haskell P
 
 ## Combinators
 
-### Speculative Function Application
+Speculative Function Application (Control.Concurrent.Speculation)
+-----------------------------------------------------------------
 
 Various speculative function application combinators are provided. Two fairly canonical samples are described here.
 
@@ -46,7 +47,8 @@ Compare these to the timeline of @f $! a@:
 
 `specSTM` provides a similar compressed timeline for speculated STM actions, but also rolls back side-effects.
 
-### Speculative Folds
+Speculative Folds (Data.Foldable.Speculation)
+---------------------------------------------
 
 A speculative version of Data.Foldable is provided as Data.Foldable.Speculation.
     
@@ -71,6 +73,8 @@ As with `spec`, if the guess `g n` is accurate a reasonable percentage of the ti
 Contact Information
 -------------------
 
-I can be reached through the user ekmett on github, as edwardk on irc.freenode.net #haskell channel, or by email to <ekmett@gmail.com>.
+Contributions and bug reports are welcome!
+
+I can be reached through the user ekmett on github, as edwardk on irc.freenode.net #haskell channel, or by email at <ekmett@gmail.com>.
 
 -Edward Kmett

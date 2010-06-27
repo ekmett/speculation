@@ -64,7 +64,7 @@ specSTM' g f a = a `par` do
     try `catchSTM` \e -> case fromException e of
         Just exn' | exn == exn' -> f a -- rerun with alternative inputs
         _ -> throw e                   -- this is somebody else's problem
-{-# INLINE specSTM #-}
+{-# INLINE specSTM' #-}
 
 speculationSupply :: TVar Int
 speculationSupply = unsafePerformIO $ newTVarIO 0

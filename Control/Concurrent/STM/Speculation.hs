@@ -49,6 +49,7 @@ specSTM :: Eq a => a -> (a -> STM b) -> a -> STM b
 specSTM g f a 
     | evaluated a = f a 
     | otherwise   = specSTM' g f a
+{-# INLINE specSTM #-}
 
 -- | Unlike @specSTM@, @specSTM'@ doesn't check if the argument has already been evaluated.
 
@@ -63,12 +64,15 @@ specSTM' g f a = a `par` do
     try `catchSTM` \e -> case fromException e of
         Just exn' | exn == exn' -> f a -- rerun with alternative inputs
         _ -> throw e                   -- this is somebody else's problem
+{-# INLINE specSTM #-}
 
 speculationSupply :: TVar Int
 speculationSupply = unsafePerformIO $ newTVarIO 0
+{-# NOINLINE speculationSupply #-}
 
 freshSpeculation :: STM Speculation
 freshSpeculation = do
     n <- readTVar speculationSupply
     writeTVar speculationSupply $! n + 1
     return (Speculation n)
+{-# INLINE freshSpeculation #-}

@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.2.1
+version:        0.3.0
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -9,58 +9,46 @@ homepage:       http://github.com/ekmett/speculation
 category:       Concurrency
 synopsis:       A framework for safe, programmable, speculative parallelism
 description:
-    A framework for safe, programmable, speculative parallelism, loosely based on
-    <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
-    .
-    @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise @f a@ is evaluated.
-    .
-    Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
-    .
-    If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
-    .
-    However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
-    wrong, you risk evaluating the function twice.
-    .
-    > spec a f a = f $! a
-    .
-    The best-case timeline looks like:
-    .
-    > [---- f g ----]
-    >    [----- a -----]
-    > [-- spec g f a --]
-    .
-    The worst-case timeline looks like:
-    .
-    > [---- f g ----]
-    >    [----- a -----]
-    >                  [---- f a ----]
-    > [------- spec g f a -----------]
-    .
-    Compare these to the timeline of @f $! a@:
-    .
-    > [---- a -----]
-    >              [---- f a ----]
-    .
-    'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
-    .
-    /Changes in 0.1.0:/
-    .
-    * Added @Control.Concurrent.STM.Speculation@ with 'specSTM', and 'specSTM''
-    .
-    /Changes in 0.0.2:/
-    .
-    * 'specFoldr1' bug fix
-    .
-    * Added 'spec'' combinator
-    .
-    /Changes in 0.0.1:/
-    .
-    * Added 'WithoutSpeculation' and 'WrappedFoldable'
+ A framework for safe, programmable, speculative parallelism, loosely based on
+ <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
+ .
+ This package provides speculative function application and speculative folds. And speculative STM actions take the place
+ of the transactional rollback machinery from the paper.
+ .
+ For example:
+ . 
+ @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice.
+ .
+ The best-case timeline looks like:
+ .
+ > [---- f g ----]
+ >    [----- a -----]
+ > [-- spec g f a --]
+ .
+ The worst-case timeline looks like:
+ .
+ > [---- f g ----]
+ >    [----- a -----]
+ >                  [---- f a ----]
+ > [------- spec g f a -----------]
+ .
+ Compare these to the timeline of @f $! a@:
+ .
+ > [---- a -----]
+ >              [---- f a ----]
+ .
+ 'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
+ . 
+ /Changes in 0.3.0:/
+ . 
+ * Speculative folds moved to 'Data.Foldable.Speculation' and expanded to cover all of the 
+   'Data.Foldable' combinators.
+ * specBy and specOn variants added.
 
-copyright:      (c) 2010 Edward A. Kmett
-build-type:     Simple
-cabal-version:  >=1.2
-tested-with:    GHC==6.12.1
+copyright:          (c) 2010 Edward A. Kmett
+build-type:         Simple
+cabal-version:      >=1.2
+tested-with:        GHC==6.12.1
 extra-source-files: README.markdown
 
 library
@@ -74,3 +62,4 @@ library
   exposed-modules:
     Control.Concurrent.Speculation
     Control.Concurrent.STM.Speculation
+    Data.Foldable.Speculation

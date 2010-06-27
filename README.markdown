@@ -1,35 +1,65 @@
 speculation
 ===========
 
-Speculative evaluation primitives for Haskell, very loosely based on the paper "Safe Programmable Speculative Parallelism" by
-Prabhu, Ramalingam, and Vaswani. <http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.19.4622>
+This package provides speculative evaluation primitives for Haskell, very loosely based on the paper 
+"Safe Programmable Speculative Parallelism" by Prabhu, Ramalingam, and Vaswani. 
 
-spec
-----
+<http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.19.4622>
+
+## Combinators
+
+### speculative function application
+
+#### spec
 
     spec :: Eq a => a -> (a -> b) -> a -> b
 
-`spec` takes three arguments: An initial guess as to what the argument to the function will be when it is evaluated, a function to evaluate, and the actual argument to the function. 
+`spec g f a` evaluates `f g` while forcing `a`, if `g == a` then `f g` is returned. Otherwise `f a` is evaluated.
 
-Spec checks to see if its actual argument has been evaluated, if so it just applies the function to the argument.
+Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
 
-Otherwise, it begins evaluating the function with the guessed argument in parallel with evaluating the argument.
+If `g` is a good guess at the value of `a`, this is one way to induce parallelism in an otherwise sequential task.
 
-If you guessed right, then the result of applying the function to your guess is returned.
+However, if `g` isn\'t available more cheaply than `a`, then this saves no work, and if `g` is wrong, you risk evaluating the function twice.
+    spec a f a = f $! a
+    
+The best-case timeline looks like:
+    [---- f g ----]
+       [----- a -----]
+    [-- spec g f a --]
 
-Otherwise, it then evaluates the function with the correct argument.
+The worst-case timeline looks like:
+    [---- f g ----]
+       [----- a -----]
+                     [---- f a ----]
+    [------- spec g f a -----------]
+    
+Compare these to the timeline of @f $! a@:
+    [---- a -----]
+                 [---- f a ----]
 
-If a good guess is available, this permits us to increase parallelism in the resulting program.
+#### specSTM
 
-It is subject to the following identity:
+`specSTM` provides a similar compressed timeline for speculated STM actions, but also rolls back side-effects.
 
-    spec a f a = a `seq` f a 
+### folds
 
-speculative folds
------------------
-
-A number of speculative folds are also provided via the Speculative class.
-
+A number of speculative folds are also provided.
+    
 These take an extra argument which is a function that guesses the result of of the fold up to a given point.
 
-A minimal definition for Speculative can be derived automatically for any Foldable container.
+#### specFoldr
+
+    specFoldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+
+Given a valid estimator `g`, `'specFoldr g f z xs` yields the same answer as `foldr' f z xs`.
+
+`g n` should supply an estimate of the value returned from folding over the /last/ `n` elements of the container.
+
+As with `spec`, if the guess `g n` is accurate a reasonable percentage of the time and faster to compute than the fold, then this can provide increased opportunities for parallelism.
+
+#### specFoldl
+
+    specFoldl :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
+
+`specFoldl` works similarly to `foldl'`, except that `g n` should provide an estimate for the /first/ `n` elements.

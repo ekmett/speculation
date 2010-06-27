@@ -1,24 +1,22 @@
 {-# LANGUAGE BangPatterns #-}
 module Control.Concurrent.Speculation
-    ( spec
+    ( 
+    -- * Speculative application
+      spec
     , spec'
+    , specBy
+    , specBy'
+    , specOn
+    , specOn'
+    -- * Detecting closure evaluation
     , evaluated
-    , specFoldr
-    , specFoldl
-    , specFoldr1
-    , specFoldl1
-    , specFoldrN
-    , specFoldlN
     ) where
 
-import Prelude hiding (foldl, foldl1, foldr, foldr1)
-import Data.Ix ()
-import Data.Foldable
 import Control.Parallel (par)
-
-import Data.Bits
-import Foreign
-import Unsafe.Coerce
+import Data.Function (on)
+import Data.Bits ((.&.))
+import Foreign (sizeOf)
+import Unsafe.Coerce (unsafeCoerce)
 
 data Box a = Box a
 
@@ -65,98 +63,40 @@ evaluated a = tag a /= 0
 -- >              [---- f a ----]
 
 spec :: Eq a => a -> (a -> b) -> a -> b
-spec g f a 
-    | evaluated a = f a 
-    | otherwise = spec' g f a
+spec = specBy (==) 
 {-# INLINE spec #-}
 
 -- | Unlike 'spec', this version does not check to see if the argument has already been evaluated. This can save
 -- a small amount of work when you know the argument will always require computation.
 
 spec' :: Eq a => a -> (a -> b) -> a -> b
-spec' guess f a = 
+spec' = specBy' (==)
+{-# INLINE spec' #-}
+
+-- | 'spec' with a user defined comparison function
+specBy :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
+specBy cmp g f a
+    | evaluated a = f a
+    | otherwise = specBy' cmp g f a
+{-# INLINE specBy #-}
+
+-- | 'spec'' with a user defined comparison function
+specBy' :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
+specBy' cmp guess f a = 
     speculation `par` 
-        if guess == a
+        if cmp guess a
         then speculation
         else f a
     where 
         speculation = f guess
-{-# INLINE spec' #-}
+{-# INLINE specBy' #-}
 
--- | Given a valid estimator @g@, @'specFoldr' g f z xs@ yields the same answer as @'foldr'' f z xs@.
---
--- @g n@ should supply an estimate of the value returned from folding over the last @n@ elements of the container.
---
--- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
--- provide increased opportunities for parallelism.
---
--- > specFoldr = specFoldrN 0
+-- | 'spec' comparing by projection onto another type
+specOn :: Eq c => (a -> c) -> a -> (a -> b) -> a -> b
+specOn = specBy . on (==)
+{-# INLINE specOn #-}
 
-specFoldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
-specFoldr = specFoldrN 0
-{-# INLINE specFoldr #-}
-
--- | Given a valid estimator @g@, @'specFoldl' g f z xs@ yields the same answer as @'foldl'' f z xs@.
---
--- @g n@ should supply an estimate of the value returned from folding over the first @n@ elements of the container.
---
--- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
--- provide increased opportunities for parallelism.
---
--- > specFoldl = specFoldlN 0
-
-specFoldl  :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
-specFoldl = specFoldlN 0
-{-# INLINE specFoldl #-}
-
--- | 'specFoldr1' is to 'foldr1'' as 'specFoldr' is to 'foldr''
-specFoldr1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
-specFoldr1 g f = specFoldr1List g f . toList
-{-# INLINE specFoldr1 #-}
-
-specFoldr1List :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> a
-specFoldr1List g f = go 0  
-      where
-        go _ []  = errorEmptyStructure "specFoldr1"
-        go _ [x] = x
-        go !n (x:xs) = n' `seq` spec' (g n') (f x) (go n' xs)
-          where 
-            n' = n + 1
-{-# INLINE specFoldr1List #-}
-
--- | Given a valid estimator @g@, @'specFoldrN' n g f z xs@ yields the same answer as @'foldr' f z xs@.
--- 
--- @g m@ should supply an estimate of the value returned from folding over the last @m - n@ elements of the container.
-specFoldrN :: (Foldable f, Eq b) => Int -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
-specFoldrN n0 g f z = go n0 . toList
-    where
-        go _ [] = z
-        go !n (x:xs) = n' `seq` spec' (g n') (f x) (go n' xs)
-          where 
-            n' = n + 1
-{-# INLINE specFoldrN #-}
-
--- | 'specFoldl1' is to 'foldl1'' as 'specFoldl' is to 'foldl''
-specFoldl1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
-specFoldl1 g f = specFoldl1List g f . toList
-{-# INLINE specFoldl1 #-}
-
-specFoldl1List :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> a
-specFoldl1List _ _ []     = errorEmptyStructure "specFoldl1"
-specFoldl1List g f (x:xs) = specFoldlN 1 g f x xs
-{-# INLINE specFoldl1List #-}
-
--- | Given a valid estimator @g@, @'specFoldlN' n g f z xs@ yields the same answer as @'foldl' f z xs@.
--- 
--- @g m@ should supply an estimate of the value returned from folding over the first @m - n@ elements of the container.
-specFoldlN :: (Foldable f, Eq b) => Int -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
-specFoldlN n0 g f z0 = go n0 z0 . toList
-  where
-    go _ z [] = z
-    go !n z (x:xs) = n' `seq` spec' (g n') (\z' -> go n' z' xs) (f z x)
-      where 
-        n' = n + 1
-{-# INLINE specFoldlN #-}
-
-errorEmptyStructure :: String -> a
-errorEmptyStructure f = error $ f ++ ": error empty structure"
+-- | 'spec'' comparing by projection onto another type
+specOn' :: Eq c => (a -> c) -> a -> (a -> b) -> a -> b
+specOn' = specBy' . on (==)
+{-# INLINE specOn' #-}

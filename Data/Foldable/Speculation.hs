@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
 module Data.Foldable.Speculation
     ( 
     -- * Speculative folds
@@ -8,14 +8,24 @@ module Data.Foldable.Speculation
     , foldl, foldlBy
     , foldr1, foldr1By
     , foldl1, foldl1By
+    -- ** Speculative monadic folds
+    , foldrM, foldrByM
+    , foldlM, foldlByM
+    -- * Speculative transactional folds
+    , foldrSTM, foldrBySTM
+    , foldlSTM, foldlBySTM
+    -- * Folding actions
+    -- ** Applicative actions
     , traverse_, traverseBy_
     , for_, forBy_
+    , sequenceA_, sequenceABy_
+    , asum, asumBy
+    -- ** Monadic actions
     , mapM_, mapMBy_
     , forM_, forMBy_
-    , sequenceA_, sequenceABy_
     , sequence_, sequenceBy_
-    , asum, asumBy
     , msum, msumBy
+    -- * Specialized folds
     , toList, toListBy
     , concat, concatBy
     , concatMap, concatMapBy
@@ -24,6 +34,7 @@ module Data.Foldable.Speculation
     , product, productBy
     , maximum, maximumBy
     , minimum, minimumBy
+    -- * Searches
     , elem, elemBy
     , notElem, notElemBy
     , find, findBy
@@ -40,9 +51,8 @@ import Data.Ix ()
 import Data.Function (on)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as Foldable
--- import Control.Concurrent.STM
+import Control.Concurrent.STM
 import Control.Concurrent.Speculation
--- import Control.Concurrent.Speculation.Internal (Codensity(..))
 import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
@@ -94,15 +104,61 @@ foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
     mf a (Acc n b) = let n' = n + 1 in Acc n' (specBy' cmp (g n') (f a) b)
 {-# INLINE foldrBy #-}
 
-{-
-foldrSTM :: (Foldable f, Eq b) => (Int -> STM b) -> (a -> b -> STM b) -> b -> f a -> STM b
-foldrSTM = foldrSTMBy (==)
+foldlM :: (Foldable f, Monad m, Eq (m b)) => (Int -> m b) -> (b -> a -> m b) -> m b -> f a -> m b
+foldlM = foldlByM (==)
+{-# INLINE foldlM #-}
+
+foldlByM ::  (Foldable f, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> (b -> a -> m b) -> m b -> f a -> m b
+foldlByM  cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz) 
+  where
+    go mia b = do
+      Acc n a <- mia
+      let !n' = n + 1
+      a' <- specBy' cmp (g n') (>>= (`f` b)) (return a)
+      return (Acc n' a')
+{-# INLINE foldlByM #-}
+
+foldrM :: (Foldable f, Monad m, Eq (m b)) => (Int -> m b) -> (a -> b -> m b) -> m b -> f a -> m b
+foldrM = foldrByM (==)
+{-# INLINE foldrM #-}
+
+foldrByM :: (Foldable f, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> (a -> b -> m b) -> m b -> f a -> m b
+foldrByM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz) 
+  where
+    go a mib = do
+      Acc n b <- mib
+      let !n' = n + 1
+      b' <- specBy' cmp (g n') (>>= f a) (return b)
+      return (Acc n' b')
+{-# INLINE foldrByM #-}
+
+foldlSTM :: (Foldable f, Eq a) => (Int -> STM a) -> (a -> b -> STM a) -> STM a -> f b -> STM a
+foldlSTM = foldlBySTM (==)
+{-# INLINE foldlSTM #-}
+
+foldlBySTM :: Foldable f => (a -> a -> Bool) -> (Int -> STM a) -> (a -> b -> STM a) -> STM a -> f b -> STM a
+foldlBySTM cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
+  where
+    go mia b = do
+      Acc n a <- mia
+      let !n' = n + 1
+      a' <- specBySTM' cmp (g n') (`f` b) a
+      return (Acc n' a')
+{-# INLINE foldlBySTM #-}
+
+foldrSTM :: (Foldable f, Eq b) => (Int -> STM b) -> (a -> b -> STM b) -> STM b -> f a -> STM b
+foldrSTM = foldrBySTM (==)
 {-# INLINE foldrSTM #-}
 
-foldrSTMBy :: Foldable f => (b -> b -> Bool) -> (Int -> STM b) -> (a -> b -> STM b) -> b -> f a -> STM b
-foldrSTMBy = undefined
-{-# INLINE foldrSTMBy #-}
--}
+foldrBySTM :: Foldable f => (b -> b -> Bool) -> (Int -> STM b) -> (a -> b -> STM b) -> STM b -> f a -> STM b
+foldrBySTM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
+  where
+    go a mib = do
+      Acc n b <- mib
+      let !n' = n + 1
+      b' <- specBySTM' cmp (g n') (f a) b
+      return (Acc n' b')
+{-# INLINE foldrBySTM #-}
 
 {-
 foldrSTMBy cmp g f z xs = liftM extractAcc . Foldable.foldl mf return xs (Acc 0 z)

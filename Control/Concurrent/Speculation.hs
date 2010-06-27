@@ -15,29 +15,14 @@ module Control.Concurrent.Speculation
     , specOnSTM'
     , specBySTM
     , specBySTM'
-    -- * Codensity STM speculation
-    , specCSTM
-    , specCSTM'
-    , specOnCSTM
-    , specOnCSTM'
-    , specByCSTM
-    , specByCSTM'
-    , CSTM
-    -- * Codensity
-    , Codensity(..)
-    , liftCodensity
-    , lowerCodensity
     ) where
 
 import Control.Concurrent.STM
-import Control.Concurrent.Speculation.Internal 
-    (Codensity(..), liftCodensity, lowerCodensity, evaluated)
+import Control.Concurrent.Speculation.Internal (evaluated)
 import Control.Exception (Exception, throw, fromException)
 import Control.Parallel (par)
 import Data.Typeable (Typeable)
 import Data.Function (on)
-
-type CSTM = Codensity STM
 
 -- * Basic speculation
 
@@ -142,30 +127,31 @@ specOn' = specBy' . on (==)
 -- > [------- a -------]
 -- >                   [------ f a ------]
 
-specSTM :: Eq a => a -> (a -> STM b) -> a -> STM b
+specSTM :: Eq a => STM a -> (a -> STM b) -> a -> STM b
 specSTM = specBySTM (==)
 {-# INLINE specSTM #-}
 
 -- | Unlike 'specSTM', 'specSTM'' doesn't check if the argument has already been evaluated.
 
-specSTM' :: Eq a => a -> (a -> STM b) -> a -> STM b
+specSTM' :: Eq a => STM a -> (a -> STM b) -> a -> STM b
 specSTM' = specBySTM' (==)
 {-# INLINE specSTM' #-}
 
 -- | 'specSTM' using a user defined comparison function
-specBySTM :: (a -> a -> Bool) -> a -> (a -> STM b) -> a -> STM b
+specBySTM :: (a -> a -> Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM cmp g f a 
     | evaluated a = f a 
     | otherwise   = specBySTM' cmp g f a
 {-# INLINE specBySTM #-}
 
 -- | 'specSTM'' using a user defined comparison function
-specBySTM' :: (a -> a -> Bool) -> a -> (a -> STM b) -> a -> STM b
+specBySTM' :: (a -> a -> Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM' cmp g f a = a `par` 
     let 
       try = do
-        result <- f g 
-        if cmp g a
+        g' <- g
+        result <- f g'
+        if cmp g' a
           then return result
           else throw Speculation
     in 
@@ -175,49 +161,14 @@ specBySTM' cmp g f a = a `par`
 {-# INLINE specBySTM' #-}
 
 -- | 'specBySTM' . 'on' (==)'
-specOnSTM :: Eq c => (a -> c) -> a -> (a -> STM b) -> a -> STM b
+specOnSTM :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM = specBySTM . on (==)
 {-# INLINE specOnSTM #-}
 
 -- | 'specBySTM'' . 'on' (==)'
-specOnSTM' :: Eq c => (a -> c) -> a -> (a -> STM b) -> a -> STM b
+specOnSTM' :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (==)
 {-# INLINE specOnSTM' #-}
-
--- ** Codensity STM speculation
-
-specCSTM :: Eq a => a -> (a -> CSTM b) -> a -> CSTM b
-specCSTM = specByCSTM (==)
-{-# INLINE specCSTM #-}
-
--- | Unlike 'specCSTM', 'specCSTM'' doesn't check if the argument has already been evaluated.
-
-specCSTM' :: Eq a => a -> (a -> CSTM b) -> a -> CSTM b
-specCSTM' = specByCSTM' (==)
-{-# INLINE specCSTM' #-}
-
--- | 'specCSTM' using a user defined comparison function
-specByCSTM :: (a -> a -> Bool) -> a -> (a -> CSTM b) -> a -> CSTM b
-specByCSTM cmp g f a 
-    | evaluated a = f a 
-    | otherwise   = specByCSTM' cmp g f a
-{-# INLINE specByCSTM #-}
-
--- | 'specCSTM'' using a user defined comparison function
-specByCSTM' :: (a -> a -> Bool) -> a -> (a -> CSTM b) -> a -> CSTM b
-specByCSTM' cmp g f a = Codensity $ \k -> 
-        specBySTM cmp g (lowerCodensity . f) a  >>= k
-{-# INLINE specByCSTM' #-}
-
--- | 'specByCSTM' . 'on' (==)'
-specOnCSTM :: Eq c => (a -> c) -> a -> (a -> CSTM b) -> a -> CSTM b
-specOnCSTM = specByCSTM . on (==)
-{-# INLINE specOnCSTM #-}
-
--- | 'specByCSTM'' . 'on' (==)'
-specOnCSTM' :: Eq c => (a -> c) -> a -> (a -> CSTM b) -> a -> CSTM b
-specOnCSTM' = specByCSTM' . on (==)
-{-# INLINE specOnCSTM' #-}
 
 data Speculation = Speculation deriving (Show,Eq,Typeable)
 instance Exception Speculation

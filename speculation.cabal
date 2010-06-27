@@ -7,13 +7,14 @@ maintainer:     Edward A. Kmett <ekmett@gmail.com>
 stability:      experimental
 homepage:       http://comonad.com/reader
 category:       Concurrency
-synopsis:       A framework for speculative evaluation
-description:    A framework for speculative evaluation
+synopsis:       A framework for safe, programmable, speculative parallelism
+description:    A framework for safe, programmable, speculative parallelism, loosely based on
+                <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
 copyright:      (c) 2010 Edward A. Kmett
 build-type:     Simple
 cabal-version:  >=1.2
 tested-with:    GHC==6.12.1
-extra-files:    README.markdown
+extra-source-files: README.markdown
 
 library
   ghc-options: -Wall

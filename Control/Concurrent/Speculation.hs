@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns, FlexibleContexts, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
 module Control.Concurrent.Speculation
     ( spec
+    , spec'
     , evaluated
     , specFoldr
     , specFoldl
@@ -42,18 +43,56 @@ evaluated :: a -> Bool
 evaluated a = tag a /= 0
 {-# INLINE evaluated #-}
 
--- | Evaluate a function using a cheap guess at the argument in parallel with forcing the argument.
+-- | @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise @f a@ is evaluated.
 --
--- This is one way to induce parallelism in an otherwise sequential task.
--- If the argument has already been evaluated, we avoid sparking the parallel computation.
+-- Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
+--
+-- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. 
+--
+-- However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
+-- wrong, you risk evaluating the function twice.
+--
+-- > spec a f a = a `seq` f a
+--
+-- The best-case timeline looks like:
+--
+-- > [---- f g ----]
+-- >    [----- a -----]
+-- > [-- spec g f a --]
+-- 
+-- The worst-case timeline looks like:
+--
+-- > [---- f g ----]
+-- >    [----- a -----]
+-- >                  [---- f a ----]
+-- > [------- spec g f a -----------]
+--
+-- Compared to the unspeculated timeline of
+--
+-- > [---- a -----]
+-- >              [---- f a ----]
+
 spec :: Eq a => a -> (a -> b) -> a -> b
-spec guess f a 
+spec g f a 
     | evaluated a = f a 
-    | otherwise = 
-        speculation `par` 
-            if guess == a
-            then speculation
-            else f a
+    | otherwise = spec' g f a
+
+-- | @'spec'' g f a@ evaluates a function @f @ using a cheap guess @g@ at the argument in parallel with forcing the argument.
+--
+-- This is one way to induce parallelism in an otherwise sequential task. 
+-- Unlike `spec` this version
+-- does not check to see if the argument has already been evaluated before evaluating the speculated
+-- version. This is useful when you know 'evaluated' will always return False.
+--
+-- The following identity holds:
+--
+-- > spec' a f a = a `seq` f a
+spec' :: Eq a => a -> (a -> b) -> a -> b
+spec' guess f a = 
+    speculation `par` 
+        if guess == a
+        then speculation
+        else f a
     where 
         speculation = f guess
 {-# INLINE spec #-}
@@ -89,20 +128,21 @@ errorEmptyStructure f = error $ f ++ ": error empty structure"
 instance Speculative [] where
     specFoldr1 g f = go 0  
       where
-        go _ [] = errorEmptyStructure "specFoldr1"
-        go !n (x:xs) = n' `seq` spec (g n') (f x) (go n' xs)
+        go _ []  = errorEmptyStructure "specFoldr1"
+        go _ [x] = x
+        go !n (x:xs) = n' `seq` spec' (g n') (f x) (go n' xs)
           where 
             n' = n + 1
 
     specFoldrN _ _ _ z [] = z
-    specFoldrN !n g f z (x:xs) = n' `seq` spec (g n') (f x) (specFoldrN n' g f z xs)
+    specFoldrN !n g f z (x:xs) = n' `seq` spec' (g n') (f x) (specFoldrN n' g f z xs)
       where 
         n' = n + 1
         
     specFoldl1 _ _ []     = errorEmptyStructure "specFoldl1"
     specFoldl1 g f (x:xs) = specFoldlN 1 g f x xs
     specFoldlN  _ _ _ z [] = z
-    specFoldlN !n g f z (x:xs) = n' `seq` spec (g n') (\z' -> specFoldlN n' g f z' xs) (f z x)
+    specFoldlN !n g f z (x:xs) = n' `seq` spec' (g n') (\z' -> specFoldlN n' g f z' xs) (f z x)
       where 
         n' = n + 1
 

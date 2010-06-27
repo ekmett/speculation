@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.0.1
+version:        0.0.2
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -8,8 +8,49 @@ stability:      experimental
 homepage:       http://github.com/ekmett/speculation
 category:       Concurrency
 synopsis:       A framework for safe, programmable, speculative parallelism
-description:    A framework for safe, programmable, speculative parallelism, loosely based on
-                <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
+description:    
+    A framework for safe, programmable, speculative parallelism, loosely based on
+    <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
+    . 
+    @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise @f a@ is evaluated.
+    .   
+    Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
+    .
+    If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. 
+    .
+    However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
+    wrong, you risk evaluating the function twice.
+    .
+    > spec a f a = a `seq` f a
+    .
+    The best-case timeline looks like:
+    .
+    > [---- f g ----]
+    >    [----- a -----]
+    > [-- spec g f a --]
+    .
+    The worst-case timeline looks like:
+    .
+    > [---- f g ----]
+    >    [----- a -----]
+    >                  [---- f a ----]
+    > [------- spec g f a -----------]
+    .
+    Compared to the unspeculated timeline of
+    .
+    > [---- a -----]
+    >              [---- f a ----]
+    .
+    Changes since 0.0.1
+    .
+    * 'specFoldr1' bug fix
+    .
+    * Added 'spec'' combinator
+    .
+    Changes since 0.0.0
+    .
+    * Added 'WithoutSpeculation' and 'WrappedFoldable'
+
 copyright:      (c) 2010 Edward A. Kmett
 build-type:     Simple
 cabal-version:  >=1.2

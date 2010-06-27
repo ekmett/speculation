@@ -15,16 +15,16 @@ newtype Speculation = Speculation Int deriving (Show,Eq,Typeable)
 instance Exception Speculation
 
 -- | @'specSTM' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise the side-effects 
--- of the current STM transaction are /rolled back/ and @f a@ is evaluated.
+-- of the current STM transaction are rolled back and @f a@ is evaluated.
 --   
--- If the argument @a@ is already evaluated, we don't bother to perform @f g@ at all.
+-- If the argument @a@ is already evaluated, we don\'t bother to perform @f g@ at all.
 --
 -- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. 
 --
 -- However, if the guess isn\'t available more cheaply than the actual answer then this saves no work, and if the guess is
 -- wrong, you risk evaluating the function twice.
 --
--- > spec a f a = f $! a
+-- > specSTM a f a = f $! a
 --
 -- The best-case timeline looks like:
 --
@@ -34,11 +34,11 @@ instance Exception Speculation
 --
 -- The worst-case timeline looks like:
 --
--- >[------ f g ------] 
+-- > [------ f g ------] 
 -- >     [------- a -------]
---                         [ rollback ]
--- >                                  [------ f a ------]     
--- > [---------- spec g f a ----------------------------]
+-- >                       [-- rollback --]
+-- >                                      [------ f a ------]     
+-- > [------------------ spec g f a ------------------------]
 --
 -- Compare these to the timeline of @f $! a@:
 --

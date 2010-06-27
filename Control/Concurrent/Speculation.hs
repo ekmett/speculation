@@ -116,7 +116,7 @@ specFoldl = specFoldlN 0
 {-# INLINE specFoldl #-}
 
 class Foldable f => Speculative f where
-    -- | 'specFoldr1' is to 'foldr1' as 'specFoldr' is to 'foldr'
+    -- | 'specFoldr1' is to 'foldr1'' as 'specFoldr' is to 'foldr''
     specFoldr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
 
     -- | Given a valid estimator @g@, @'specFoldrN' n g f z xs@ yields the same answer as @'foldr' f z xs@.
@@ -124,7 +124,7 @@ class Foldable f => Speculative f where
     -- @g m@ should supply an estimate of the value returned from folding over the last @m - n@ elements of the container.
     specFoldrN :: Eq b => Int -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 
-    -- | 'specFoldl1' is to 'foldl1' as 'specFoldl' is to 'foldl'
+    -- | 'specFoldl1' is to 'foldl1'' as 'specFoldl' is to 'foldl''
     specFoldl1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
 
     -- | Given a valid estimator @g@, @'specFoldlN' n g f z xs@ yields the same answer as @'foldl' f z xs@.

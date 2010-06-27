@@ -15,14 +15,19 @@ module Control.Concurrent.Speculation
     , specOnSTM'
     , specBySTM
     , specBySTM'
+    -- * Determining if a closure is evaluated
+    , unsafeGetTagBits
+    , unsafeIsEvaluated
     ) where
 
 import Control.Concurrent.STM
-import Control.Concurrent.Speculation.Internal (evaluated)
 import Control.Exception (Exception, throw, fromException)
 import Control.Parallel (par)
 import Data.Typeable (Typeable)
 import Data.Function (on)
+import Data.Bits ((.&.))
+import Foreign (sizeOf)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- * Basic speculation
 
@@ -69,7 +74,7 @@ spec' = specBy' (==)
 -- | 'spec' with a user defined comparison function
 specBy :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
 specBy cmp g f a
-    | evaluated a = f a
+    | unsafeIsEvaluated a = f a
     | otherwise = specBy' cmp g f a
 {-# INLINE specBy #-}
 
@@ -140,7 +145,7 @@ specSTM' = specBySTM' (==)
 -- | 'specSTM' using a user defined comparison function
 specBySTM :: (a -> a -> Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM cmp g f a 
-    | evaluated a = f a 
+    | unsafeIsEvaluated a = f a 
     | otherwise   = specBySTM' cmp g f a
 {-# INLINE specBySTM #-}
 
@@ -172,3 +177,16 @@ specOnSTM' = specBySTM' . on (==)
 
 data Speculation = Speculation deriving (Show,Eq,Typeable)
 instance Exception Speculation
+
+-- | Used to inspect tag bits
+data Box a = Box a
+
+-- | Inspect the dynamic pointer tagging bits of a closure. This is an impure function that relies on GHC internals and may falsely return 0, but never give the wrong tag number if it returns a non-0 value.
+unsafeGetTagBits :: a -> Int
+unsafeGetTagBits a = unsafeCoerce (Box a) .&. (sizeOf (undefined :: Int) - 1)
+{-# INLINE unsafeGetTagBits #-}
+
+-- | Returns a guess as to whether or not a value has been evaluated. This is an impure function that relies on GHC internals and will return false negatives, but no false positives. This is unsafe as the value of this function will vary (from False to True) over the course of otherwise pure invocations!
+unsafeIsEvaluated :: a -> Bool
+unsafeIsEvaluated a = unsafeGetTagBits a /= 0
+{-# INLINE unsafeIsEvaluated #-}

@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.5.0
+version:        0.5.1
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -17,7 +17,7 @@ description:
  .
  For example:
  . 
- @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice.
+ @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. 
  .
  The best-case timeline looks like:
  .
@@ -39,9 +39,9 @@ description:
  .
  'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
  . 
- /Changes in 0.5.0:/
+ /Changes in 0.5.1:/
  . 
- * Added monadic and transactional folds to Data.Foldable.Speculation. 
+ * Exposed unsafeGetTagBits and unsafeIsEvaluated
 
 copyright:          (c) 2010 Edward A. Kmett
 build-type:         Simple
@@ -60,6 +60,3 @@ library
   exposed-modules:
     Control.Concurrent.Speculation
     Data.Foldable.Speculation
-
-  other-modules:
-    Control.Concurrent.Speculation.Internal

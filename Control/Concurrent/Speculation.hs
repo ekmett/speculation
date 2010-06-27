@@ -23,7 +23,7 @@ module Control.Concurrent.Speculation
     ) where
 
 import Control.Concurrent.STM
-import Control.Exception (Exception, throw, fromException)
+import Control.Exception (Exception, fromException, throwIO)
 import Control.Parallel (par)
 import Control.Monad (liftM2)
 import Data.Typeable (Typeable)
@@ -31,6 +31,7 @@ import Data.Function (on)
 import Data.Bits ((.&.))
 import Foreign (sizeOf)
 import Unsafe.Coerce (unsafeCoerce)
+import GHC.Conc (unsafeIOToSTM)
 
 -- * Basic speculation
 
@@ -162,12 +163,16 @@ specBySTM' cmp g f a = a `par`
         test <- cmp g' a
         if test
           then return result
-          else throw SpeculationException
+          else throwSTM SpeculationException
     in 
       try `catchSTM` \e -> case fromException e of
-        Just SpeculationException -> f a -- rerun with alternative input
-        _ -> throw e                     -- this is a bigger problem
+        Just SpeculationException -> f a        -- rerun with alternative input
+        _                         -> throwSTM e -- this is a bigger problem
+      -- try `orElse` f a -- Safer, but slower?
 {-# INLINE specBySTM' #-}
+
+throwSTM :: Exception e => e -> STM a
+throwSTM = unsafeIOToSTM . throwIO
 
 -- | @'specBySTM' . 'on' (==)@
 specOnSTM :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b

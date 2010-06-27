@@ -1,14 +1,16 @@
 speculation
 ===========
 
-This package provides speculative evaluation primitives for Haskell, very loosely based on the paper 
-"Safe Programmable Speculative Parallelism" by Prabhu, Ramalingam, and Vaswani. 
+A framework for safe, programmable, speculative parallelism, loosely based on:
 
-<http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.19.4622>
+*  Prakash Prabhu, G. Ramalingam, and Kapil Vaswani, "*Safe Programmable Speculative Parallelism*",
+   In the proceedings of Programming Language Design and Implementation (PLDI) Vol 45, Issue 6 (June 2010) pp 50-61.
+   <http://research.microsoft.com/pubs/118795/pldi026-vaswani.pdf>
+
+This package provides speculative function application and speculative folds. Speculative STM transactions take the place
+of the transactional rollback machinery from the paper.
 
 You can download it using 'cabal install speculation', if you have the Haskell Platform installed.
-
-## Combinators
 
 Speculative Function Application (Control.Concurrent.Speculation)
 -----------------------------------------------------------------

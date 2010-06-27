@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.3.0
+version:        0.4.0
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -61,5 +61,7 @@ library
 
   exposed-modules:
     Control.Concurrent.Speculation
-    Control.Concurrent.STM.Speculation
     Data.Foldable.Speculation
+
+  other-modules:
+    Control.Concurrent.Speculation.Internal

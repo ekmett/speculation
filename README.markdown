@@ -10,6 +10,8 @@ This package provides speculative evaluation primitives for Haskell, very loosel
 
 ### speculative function application
 
+Various speculative function application combinators are provided. Two fairly canonical samples are described here.
+
 #### spec
 
     spec :: Eq a => a -> (a -> b) -> a -> b
@@ -42,24 +44,31 @@ Compare these to the timeline of @f $! a@:
 
 `specSTM` provides a similar compressed timeline for speculated STM actions, but also rolls back side-effects.
 
-### folds
+### speculative folds
 
-A number of speculative folds are also provided.
+A speculative version of Data.Foldable is provided as Data.Foldable.Speculation.
     
-These take an extra argument which is a function that guesses the result of of the fold up to a given point.
+Each combinator therein takes an extra argument that is used to speculate on the value of the list.
 
-#### specFoldr
+#### foldr
 
-    specFoldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+    foldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 
-Given a valid estimator `g`, `'specFoldr g f z xs` yields the same answer as `foldr' f z xs`.
+Given a valid estimator `g`, `'foldr g f z xs` yields the same answer as `Foldable.foldr' f z xs`.
 
 `g n` should supply an estimate of the value returned from folding over the /last/ `n` elements of the container.
 
 As with `spec`, if the guess `g n` is accurate a reasonable percentage of the time and faster to compute than the fold, then this can provide increased opportunities for parallelism.
 
-#### specFoldl
+#### foldl
 
-    specFoldl :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
+    foldl :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 
-`specFoldl` works similarly to `foldl'`, except that `g n` should provide an estimate for the /first/ `n` elements.
+`foldl` works similarly to `Foldable.foldl'`, except that `g n` should provide an estimate for the /first/ `n` elements.
+
+contact information
+-------------------
+
+I can be reached through the user ekmett on github, as edwardk on irc.freenode.net #haskell channel, or by email to <ekmett@gmail.com>.
+
+-Edward Kmett

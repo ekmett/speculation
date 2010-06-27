@@ -40,8 +40,10 @@ import Data.Ix ()
 import Data.Function (on)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as Foldable
-import Control.Applicative
+-- import Control.Concurrent.STM
 import Control.Concurrent.Speculation
+-- import Control.Concurrent.Speculation.Internal (Codensity(..))
+import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
 -- | Given a valid estimate @g@, @'fold' g f xs@ yields the same answer as @'fold' f xs@.
@@ -91,6 +93,26 @@ foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
   where 
     mf a (Acc n b) = let n' = n + 1 in Acc n' (specBy' cmp (g n') (f a) b)
 {-# INLINE foldrBy #-}
+
+{-
+foldrSTM :: (Foldable f, Eq b) => (Int -> STM b) -> (a -> b -> STM b) -> b -> f a -> STM b
+foldrSTM = foldrSTMBy (==)
+{-# INLINE foldrSTM #-}
+
+foldrSTMBy :: Foldable f => (b -> b -> Bool) -> (Int -> STM b) -> (a -> b -> STM b) -> b -> f a -> STM b
+foldrSTMBy = undefined
+{-# INLINE foldrSTMBy #-}
+-}
+
+{-
+foldrSTMBy cmp g f z xs = liftM extractAcc . Foldable.foldl mf return xs (Acc 0 z)
+  where
+    mf h t = do
+        Acc n t' <- t
+        let !n' = n + 1 
+        specSTMBy' cmp (g n') (flip f h >=> t) 
+        ...
+-}
 
 -- | Given a valid estimator @g@, @'foldl' g f z xs@ yields the same answer as @'foldl'' f z xs@.
 --

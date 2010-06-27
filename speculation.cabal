@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.6.1
+version:        0.7.0
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -42,13 +42,14 @@ description:
  .
  'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
  . 
- /Changes in 0.6.1:/
+ /Changes in 0.7.0:/
  .
  * Changed @'throw' 'SpeculationException'@ to 'retry'
+ * Removed 'SpeculationException'
  .
  /Changes in 0.6.0:/
  .
- * Upgraded the comparisons used by the STM combinators to STM actions, so they can check other STM state.
+ * Upgraded the comparisons used by the STM combinators to STM actions, so they can check other STM state
  .
  /Changes in 0.5.1:/
  . 

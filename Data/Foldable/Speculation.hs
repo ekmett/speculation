@@ -11,20 +11,22 @@ module Data.Foldable.Speculation
     -- ** Speculative monadic folds
     , foldrM, foldrByM
     , foldlM, foldlByM
-    -- * Speculative transactional folds
+    -- * Speculative transactional monadic folds
     , foldrSTM, foldrBySTM
     , foldlSTM, foldlBySTM
     -- * Folding actions
     -- ** Applicative actions
     , traverse_, traverseBy_
     , for_, forBy_
-    , sequenceA_, sequenceABy_
+    , sequenceA_, sequenceByA_
     , asum, asumBy
     -- ** Monadic actions
-    , mapM_, mapMBy_
-    , forM_, forMBy_
+    , mapM_, mapByM_
+    , forM_, forByM_
     , sequence_, sequenceBy_
     , msum, msumBy
+    -- ** Speculative transactional monadic actions
+    , mapSTM_, forSTM_, sequenceSTM_
     -- * Specialized folds
     , toList, toListBy
     , concat, concatBy
@@ -231,38 +233,54 @@ forBy_ cmp g = flip (traverseBy_ cmp g)
 {-# INLINE forBy_ #-}
 
 -- | Map each element of the structure to a monadic action, evaluating these actions
--- from left to right and ignore the results.
+-- from left to right and ignoring the results.
 mapM_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m c) -> (a -> m b) -> t a -> m ()
-mapM_ = mapMBy_ (==)
+mapM_ = mapByM_ (==)
 {-# INLINE mapM_ #-}
 
-mapMBy_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> (a -> m b) -> t a -> m ()
-mapMBy_ cmp g f = foldrBy cmp (\a -> g a >> return ()) ((>>) . f) (return ())
-{-# INLINE mapMBy_ #-}
+-- | Map each element of the structure to a monadic action, evaluating these actions
+-- from left to right and ignoring the results, while transactional side-effects from 
+-- mis-speculated actions are rolled back.
+mapSTM_ :: Foldable t => (Int -> STM c) -> (a -> STM b) -> t a -> STM ()
+mapSTM_ g f = foldrSTM (\n -> () <$ g n) (\a _ -> () <$ f a) (return ())
+{-# INLINE mapSTM_ #-}
+
+mapByM_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> (a -> m b) -> t a -> m ()
+mapByM_ cmp g f = foldrBy cmp (\n -> g n >> return ()) ((>>) . f) (return ())
+{-# INLINE mapByM_ #-}
 
 -- | 'for_' is 'mapM_' with its arguments flipped.
 forM_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m c) -> t a -> (a -> m b) -> m ()
 forM_ g = flip (mapM_ g)
 {-# INLINE forM_#-}
 
-forMBy_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> t a -> (a -> m b) -> m ()
-forMBy_ cmp g = flip (mapMBy_ cmp g)
-{-# INLINE forMBy_ #-}
+-- | 'for_' is 'mapM_' with its arguments flipped.
+forSTM_ :: Foldable t => (Int -> STM c) -> t a -> (a -> STM b) -> STM ()
+forSTM_ g = flip (mapSTM_ g)
+{-# INLINE forSTM_#-}
+
+forByM_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> t a -> (a -> m b) -> m ()
+forByM_ cmp g = flip (mapByM_ cmp g)
+{-# INLINE forByM_ #-}
 
 sequenceA_ :: (Foldable t, Applicative f, Eq (f ())) => (Int -> f b) -> t (f a) -> f ()
-sequenceA_ = sequenceABy_ (==)
+sequenceA_ = sequenceByA_ (==)
 {-# INLINE sequenceA_ #-}
 
-sequenceABy_ :: (Foldable t, Applicative f, Eq (f ())) => (f () -> f () -> Bool) -> (Int -> f b) -> t (f a) -> f ()
-sequenceABy_ cmp g = foldrBy cmp ((()<$) . g) (*>) (pure ())
-{-# INLINE sequenceABy_ #-}
+sequenceByA_ :: (Foldable t, Applicative f, Eq (f ())) => (f () -> f () -> Bool) -> (Int -> f b) -> t (f a) -> f ()
+sequenceByA_ cmp g = foldrBy cmp ((()<$) . g) (*>) (pure ())
+{-# INLINE sequenceByA_ #-}
 
 sequence_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m b) -> t (m a) -> m ()
 sequence_ = sequenceBy_ (==) 
 {-# INLINE sequence_ #-}
 
+sequenceSTM_:: Foldable t => (Int -> STM a) -> t (STM b) -> STM ()
+sequenceSTM_ g = foldrSTM (\n -> () <$ g n) (\a _ -> () <$ a) (return ())
+{-# INLINE sequenceSTM_ #-}
+
 sequenceBy_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m b) -> t (m a) -> m ()
-sequenceBy_ cmp g = foldrBy cmp (\a -> g a >> return ()) (>>) (return ())
+sequenceBy_ cmp g = foldrBy cmp (\n -> g n >> return ()) (>>) (return ())
 {-# INLINE sequenceBy_ #-}
 
 asum :: (Foldable t, Alternative f, Eq (f a)) => (Int -> f a) -> t (f a) -> f a

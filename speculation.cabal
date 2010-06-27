@@ -39,11 +39,9 @@ description:
  .
  'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
  . 
- /Changes in 0.3.0:/
+ /Changes in 0.5.0:/
  . 
- * Speculative folds moved to 'Data.Foldable.Speculation' and expanded to cover all of the 
-   'Data.Foldable' combinators.
- * specBy and specOn variants added.
+ * Added monadic and transactional folds to Data.Foldable.Speculation. 
 
 copyright:          (c) 2010 Edward A. Kmett
 build-type:         Simple

@@ -13,6 +13,7 @@ copyright:      (c) 2010 Edward A. Kmett
 build-type:     Simple
 cabal-version:  >=1.2
 tested-with:    GHC==6.12.1
+extra-files:    README.markdown
 
 library
   ghc-options: -Wall

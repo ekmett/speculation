@@ -36,7 +36,6 @@ import Control.Exception (Exception, throw, fromException)
 import Control.Parallel (par)
 import Data.Typeable (Typeable)
 import Data.Function (on)
-import System.IO.Unsafe (unsafePerformIO)
 
 type CSTM = Codensity STM
 
@@ -143,7 +142,6 @@ specOn' = specBy' . on (==)
 -- > [------- a -------]
 -- >                   [------ f a ------]
 
-
 specSTM :: Eq a => a -> (a -> STM b) -> a -> STM b
 specSTM = specBySTM (==)
 {-# INLINE specSTM #-}
@@ -163,18 +161,17 @@ specBySTM cmp g f a
 
 -- | 'specSTM'' using a user defined comparison function
 specBySTM' :: (a -> a -> Bool) -> a -> (a -> STM b) -> a -> STM b
-specBySTM' cmp g f a = a `par` do
-    exn <- freshSpeculation
+specBySTM' cmp g f a = a `par` 
     let 
       try = do
         result <- f g 
         if cmp g a
           then return result
-          else throw exn
-    try `catchSTM` \e -> case fromException e of
-        Just exn' | exn == exn' -> f a -- rerun with alternative inputs
-        _ -> throw e                   -- this is somebody else's problem
-
+          else throw Speculation
+    in 
+      try `catchSTM` \e -> case fromException e of
+        Just Speculation -> f a -- rerun with alternative input
+        _ -> throw e            -- this is a bigger problem
 {-# INLINE specBySTM' #-}
 
 -- | 'specBySTM' . 'on' (==)'
@@ -193,13 +190,13 @@ specCSTM :: Eq a => a -> (a -> CSTM b) -> a -> CSTM b
 specCSTM = specByCSTM (==)
 {-# INLINE specCSTM #-}
 
--- | Unlike 'specSTM', 'specSTM'' doesn't check if the argument has already been evaluated.
+-- | Unlike 'specCSTM', 'specCSTM'' doesn't check if the argument has already been evaluated.
 
 specCSTM' :: Eq a => a -> (a -> CSTM b) -> a -> CSTM b
 specCSTM' = specByCSTM' (==)
 {-# INLINE specCSTM' #-}
 
--- | 'specSTM' using a user defined comparison function
+-- | 'specCSTM' using a user defined comparison function
 specByCSTM :: (a -> a -> Bool) -> a -> (a -> CSTM b) -> a -> CSTM b
 specByCSTM cmp g f a 
     | evaluated a = f a 
@@ -208,18 +205,8 @@ specByCSTM cmp g f a
 
 -- | 'specCSTM'' using a user defined comparison function
 specByCSTM' :: (a -> a -> Bool) -> a -> (a -> CSTM b) -> a -> CSTM b
-specByCSTM' cmp g f a = a `par` Codensity $ \k -> do
-    exn <- freshSpeculation
-    let 
-      try = do
-        result <- lowerCodensity (f g)
-        if cmp g a
-          then k result
-          else throw exn
-    try `catchSTM` \e -> case fromException e of
-        Just exn' | exn == exn' -> lowerCodensity (f a) >>= k -- rerun with alternative inputs
-        _ -> throw e                         -- this is somebody else's problem
-
+specByCSTM' cmp g f a = Codensity $ \k -> 
+        specBySTM cmp g (lowerCodensity . f) a  >>= k
 {-# INLINE specByCSTM' #-}
 
 -- | 'specByCSTM' . 'on' (==)'
@@ -232,17 +219,5 @@ specOnCSTM' :: Eq c => (a -> c) -> a -> (a -> CSTM b) -> a -> CSTM b
 specOnCSTM' = specByCSTM' . on (==)
 {-# INLINE specOnCSTM' #-}
 
--- | TVar used to allocate speculation exceptions
-speculationSupply :: TVar Int
-speculationSupply = unsafePerformIO $ newTVarIO 0
-{-# NOINLINE speculationSupply #-}
-
-freshSpeculation :: STM Speculation
-freshSpeculation = do
-    n <- readTVar speculationSupply
-    writeTVar speculationSupply $! n + 1
-    return (Speculation n)
-{-# INLINE freshSpeculation #-}
-
-newtype Speculation = Speculation Int deriving (Show,Eq,Typeable)
+data Speculation = Speculation deriving (Show,Eq,Typeable)
 instance Exception Speculation

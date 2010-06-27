@@ -6,9 +6,11 @@ This package provides speculative evaluation primitives for Haskell, very loosel
 
 <http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.19.4622>
 
+You can download it using 'cabal install speculation', if you have the Haskell Platform installed.
+
 ## Combinators
 
-### speculative function application
+### Speculative Function Application
 
 Various speculative function application combinators are provided. Two fairly canonical samples are described here.
 
@@ -44,7 +46,7 @@ Compare these to the timeline of @f $! a@:
 
 `specSTM` provides a similar compressed timeline for speculated STM actions, but also rolls back side-effects.
 
-### speculative folds
+### Speculative Folds
 
 A speculative version of Data.Foldable is provided as Data.Foldable.Speculation.
     
@@ -66,7 +68,7 @@ As with `spec`, if the guess `g n` is accurate a reasonable percentage of the ti
 
 `foldl` works similarly to `Foldable.foldl'`, except that `g n` should provide an estimate for the **first** `n` elements.
 
-contact information
+Contact Information
 -------------------
 
 I can be reached through the user ekmett on github, as edwardk on irc.freenode.net #haskell channel, or by email to <ekmett@gmail.com>.

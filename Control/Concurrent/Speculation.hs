@@ -15,6 +15,8 @@ module Control.Concurrent.Speculation
     , specOnSTM'
     , specBySTM
     , specBySTM'
+    -- * Throw to break out of current speculation
+    , SpeculationException
     -- * Determining if a closure is evaluated
     , unsafeGetTagBits
     , unsafeIsEvaluated
@@ -23,6 +25,7 @@ module Control.Concurrent.Speculation
 import Control.Concurrent.STM
 import Control.Exception (Exception, throw, fromException)
 import Control.Parallel (par)
+import Control.Monad (liftM2)
 import Data.Typeable (Typeable)
 import Data.Function (on)
 import Data.Bits ((.&.))
@@ -133,50 +136,51 @@ specOn' = specBy' . on (==)
 -- >                   [------ f a ------]
 
 specSTM :: Eq a => STM a -> (a -> STM b) -> a -> STM b
-specSTM = specBySTM (==)
+specSTM = specBySTM (returning (==))
 {-# INLINE specSTM #-}
 
 -- | Unlike 'specSTM', 'specSTM'' doesn't check if the argument has already been evaluated.
 
 specSTM' :: Eq a => STM a -> (a -> STM b) -> a -> STM b
-specSTM' = specBySTM' (==)
+specSTM' = specBySTM' (returning (==))
 {-# INLINE specSTM' #-}
 
 -- | 'specSTM' using a user defined comparison function
-specBySTM :: (a -> a -> Bool) -> STM a -> (a -> STM b) -> a -> STM b
+specBySTM :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM cmp g f a 
     | unsafeIsEvaluated a = f a 
     | otherwise   = specBySTM' cmp g f a
 {-# INLINE specBySTM #-}
 
 -- | 'specSTM'' using a user defined comparison function
-specBySTM' :: (a -> a -> Bool) -> STM a -> (a -> STM b) -> a -> STM b
+specBySTM' :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM' cmp g f a = a `par` 
     let 
       try = do
         g' <- g
         result <- f g'
-        if cmp g' a
+        test <- cmp g' a
+        if test
           then return result
-          else throw Speculation
+          else throw SpeculationException
     in 
       try `catchSTM` \e -> case fromException e of
-        Just Speculation -> f a -- rerun with alternative input
-        _ -> throw e            -- this is a bigger problem
+        Just SpeculationException -> f a -- rerun with alternative input
+        _ -> throw e                     -- this is a bigger problem
 {-# INLINE specBySTM' #-}
 
 -- | @'specBySTM' . 'on' (==)@
-specOnSTM :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
-specOnSTM = specBySTM . on (==)
+specOnSTM :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
+specOnSTM = specBySTM . on (liftM2 (==))
 {-# INLINE specOnSTM #-}
 
 -- | @'specBySTM'' . 'on' (==)@
-specOnSTM' :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
-specOnSTM' = specBySTM' . on (==)
+specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
+specOnSTM' = specBySTM' . on (liftM2 (==))
 {-# INLINE specOnSTM' #-}
 
-data Speculation = Speculation deriving (Show,Eq,Typeable)
-instance Exception Speculation
+data SpeculationException = SpeculationException deriving (Show,Eq,Typeable)
+instance Exception SpeculationException
 
 -- | Used to inspect tag bits
 data Box a = Box a
@@ -190,3 +194,7 @@ unsafeGetTagBits a = unsafeCoerce (Box a) .&. (sizeOf (undefined :: Int) - 1)
 unsafeIsEvaluated :: a -> Bool
 unsafeIsEvaluated a = unsafeGetTagBits a /= 0
 {-# INLINE unsafeIsEvaluated #-}
+
+returning :: Monad m => (a -> b -> c) -> a -> b -> m c
+returning f a b = return (f a b)
+{-# INLINE returning #-}

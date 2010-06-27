@@ -58,7 +58,7 @@ import Control.Concurrent.Speculation
 import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
--- | Given a valid estimate @g@, @'fold' g f xs@ yields the same answer as @'fold' f xs@.
+-- | Given a valid estimator @g@, @'fold' g f xs@ yields the same answer as @'fold' f xs@.
 -- 
 -- @g n@ should supply an estimate of the value of the monoidal summation over the last @n@ elements of the container.
 -- 
@@ -74,7 +74,7 @@ foldBy :: (Foldable f, Monoid m) => (m -> m -> Bool) -> (Int -> m) -> f m -> m
 foldBy cmp g = foldrBy cmp g mappend mempty
 {-# INLINE foldBy #-}
 
--- | Given a valid estimate @g@, @'foldMap' g f xs@ yields the same answer as @'foldMap' f xs@.
+-- | Given a valid estimator @g@, @'foldMap' g f xs@ yields the same answer as @'foldMap' f xs@.
 -- 
 -- @g n@ should supply an estimate of the value of the monoidal summation over the last @n@ elements of the container.
 -- 
@@ -135,10 +135,10 @@ foldrByM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
 {-# INLINE foldrByM #-}
 
 foldlSTM :: (Foldable f, Eq a) => (Int -> STM a) -> (a -> b -> STM a) -> STM a -> f b -> STM a
-foldlSTM = foldlBySTM (==)
+foldlSTM = foldlBySTM (returning (==))
 {-# INLINE foldlSTM #-}
 
-foldlBySTM :: Foldable f => (a -> a -> Bool) -> (Int -> STM a) -> (a -> b -> STM a) -> STM a -> f b -> STM a
+foldlBySTM :: Foldable f => (a -> a -> STM Bool) -> (Int -> STM a) -> (a -> b -> STM a) -> STM a -> f b -> STM a
 foldlBySTM cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
   where
     go mia b = do
@@ -149,10 +149,10 @@ foldlBySTM cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
 {-# INLINE foldlBySTM #-}
 
 foldrSTM :: (Foldable f, Eq b) => (Int -> STM b) -> (a -> b -> STM b) -> STM b -> f a -> STM b
-foldrSTM = foldrBySTM (==)
+foldrSTM = foldrBySTM (returning (==))
 {-# INLINE foldrSTM #-}
 
-foldrBySTM :: Foldable f => (b -> b -> Bool) -> (Int -> STM b) -> (a -> b -> STM b) -> STM b -> f a -> STM b
+foldrBySTM :: Foldable f => (b -> b -> STM Bool) -> (Int -> STM b) -> (a -> b -> STM b) -> STM b -> f a -> STM b
 foldrBySTM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
   where
     go a mib = do
@@ -241,8 +241,8 @@ mapM_ = mapByM_ (==)
 -- | Map each element of the structure to a monadic action, evaluating these actions
 -- from left to right and ignoring the results, while transactional side-effects from 
 -- mis-speculated actions are rolled back.
-mapSTM_ :: Foldable t => (Int -> STM c) -> (a -> STM b) -> t a -> STM ()
-mapSTM_ g f = foldrSTM (\n -> () <$ g n) (\a _ -> () <$ f a) (return ())
+mapSTM_ :: Foldable t => STM Bool -> (Int -> STM c) -> (a -> STM b) -> t a -> STM ()
+mapSTM_ chk g f = foldrBySTM (\_ _ -> chk) (\n -> () <$ g n) (\a _ -> () <$ f a) (return ())
 {-# INLINE mapSTM_ #-}
 
 mapByM_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> (a -> m b) -> t a -> m ()
@@ -255,8 +255,8 @@ forM_ g = flip (mapM_ g)
 {-# INLINE forM_#-}
 
 -- | 'for_' is 'mapM_' with its arguments flipped.
-forSTM_ :: Foldable t => (Int -> STM c) -> t a -> (a -> STM b) -> STM ()
-forSTM_ g = flip (mapSTM_ g)
+forSTM_ :: Foldable t => STM Bool -> (Int -> STM c) -> t a -> (a -> STM b) -> STM ()
+forSTM_ chk g = flip (mapSTM_ chk g)
 {-# INLINE forSTM_#-}
 
 forByM_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> t a -> (a -> m b) -> m ()
@@ -275,8 +275,8 @@ sequence_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m b) -> t (m a) -> m ()
 sequence_ = sequenceBy_ (==) 
 {-# INLINE sequence_ #-}
 
-sequenceSTM_:: Foldable t => (Int -> STM a) -> t (STM b) -> STM ()
-sequenceSTM_ g = foldrSTM (\n -> () <$ g n) (\a _ -> () <$ a) (return ())
+sequenceSTM_:: Foldable t => STM Bool -> (Int -> STM a) -> t (STM b) -> STM ()
+sequenceSTM_ chk g = foldrBySTM (\_ _ -> chk) (\n -> () <$ g n) (\a _ -> () <$ a) (return ())
 {-# INLINE sequenceSTM_ #-}
 
 sequenceBy_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m b) -> t (m a) -> m ()
@@ -419,3 +419,6 @@ fromMaybeAcc a _ = a
 
 errorEmptyStructure :: String -> a
 errorEmptyStructure f = error $ f ++ ": error empty structure"
+
+returning :: Monad m => (a -> b -> c) -> a -> b -> m c
+returning f a b = return (f a b)

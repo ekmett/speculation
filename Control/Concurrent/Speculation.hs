@@ -5,8 +5,6 @@ module Control.Concurrent.Speculation
     , evaluated
     , specFoldr
     , specFoldl
---    , specFoldl'
---    , specFoldr'
     , Speculative(..)
     , WrappedFoldable(..)
     , WithoutSpeculation(..)
@@ -52,7 +50,7 @@ evaluated a = tag a /= 0
 -- However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
 -- wrong, you risk evaluating the function twice.
 --
--- > spec a f a = a `seq` f a
+-- > spec a f a = f $! a
 --
 -- The best-case timeline looks like:
 --
@@ -67,7 +65,7 @@ evaluated a = tag a /= 0
 -- >                  [---- f a ----]
 -- > [------- spec g f a -----------]
 --
--- Compared to the unspeculated timeline of
+-- Compare these to the timeline of @f $! a@:
 --
 -- > [---- a -----]
 -- >              [---- f a ----]
@@ -76,17 +74,11 @@ spec :: Eq a => a -> (a -> b) -> a -> b
 spec g f a 
     | evaluated a = f a 
     | otherwise = spec' g f a
+{-# INLINE spec #-}
 
--- | @'spec'' g f a@ evaluates a function @f @ using a cheap guess @g@ at the argument in parallel with forcing the argument.
---
--- This is one way to induce parallelism in an otherwise sequential task. 
--- Unlike `spec` this version
--- does not check to see if the argument has already been evaluated before evaluating the speculated
--- version. This is useful when you know 'evaluated' will always return False.
---
--- The following identity holds:
---
--- > spec' a f a = a `seq` f a
+-- | Unlike 'spec', this version does not check to see if the argument has already been evaluated. This can save
+-- a small amount of work when you know the argument will always require computation.
+
 spec' :: Eq a => a -> (a -> b) -> a -> b
 spec' guess f a = 
     speculation `par` 
@@ -95,25 +87,49 @@ spec' guess f a =
         else f a
     where 
         speculation = f guess
-{-# INLINE spec #-}
+{-# INLINE spec' #-}
 
--- | Compute a right biased fold. The estimator function provides a guess at the value of the suffix
+-- | Given a valid estimator @g@, @'specFoldr' g f z xs@ yields the same answer as @'foldr'' f z xs@.
+--
+-- @g n@ should supply an estimate of the value returned from folding over the last @n@ elements of the container.
+--
+-- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
+-- provide increased opportunities for parallelism.
+--
+-- > specFoldr = specFoldrN 0
+
 specFoldr :: (Speculative f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 specFoldr = specFoldrN 0
 {-# INLINE specFoldr #-}
 
--- | Compute a left-biased fold. The estimator function provides a guess at the value of the prefix
+-- | Given a valid estimator @g@, @'specFoldl' g f z xs@ yields the same answer as @'foldl'' f z xs@.
+--
+-- @g n@ should supply an estimate of the value returned from folding over the first @n@ elements of the container.
+--
+-- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
+-- provide increased opportunities for parallelism.
+--
+-- > specFoldl = specFoldlN 0
+
 specFoldl  :: (Speculative f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 specFoldl = specFoldlN 0
 {-# INLINE specFoldl #-}
 
 class Foldable f => Speculative f where
-    -- | Compute a right-biased fold. The estimator function is a guess at the value of the prefix
+    -- | 'specFoldr1' is to 'foldr1' as 'specFoldr' is to 'foldr'
     specFoldr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
+
+    -- | Given a valid estimator @g@, @'specFoldrN' n g f z xs@ yields the same answer as @'foldr' f z xs@.
+    -- 
+    -- @g m@ should supply an estimate of the value returned from folding over the last @m - n@ elements of the container.
     specFoldrN :: Eq b => Int -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 
-    -- | Compute a left biased fold. the estimator function is a guess at the value of the prefix
+    -- | 'specFoldl1' is to 'foldl1' as 'specFoldl' is to 'foldl'
     specFoldl1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
+
+    -- | Given a valid estimator @g@, @'specFoldlN' n g f z xs@ yields the same answer as @'foldl' f z xs@.
+    -- 
+    -- @g m@ should supply an estimate of the value returned from folding over the first @m - n@ elements of the container.
     specFoldlN :: Eq b => Int -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 
     specFoldr1 g f = specFoldr1 g f . toList
@@ -159,16 +175,7 @@ instance Speculative (Map a)
 instance Speculative IntMap
 instance Speculative Seq
 
--- specFoldl' :: (Speculative f, Eq a) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
--- specFoldl' g f z0 xs = specFoldr g' f' id xs z0 where
---     f' x k z = k $! f z x
---    g' = undefined -- n z = f (g n) z
-
--- specFoldr' :: (Speculative f, Eq a) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
--- specFoldr' g f z0 xs = specFoldl g' f' id xs z0 where
---    f' x k z = k $! f x z
---    g' = undefined -- n z = f (g n) z
-
+-- | Transform an arbitrary 'Foldable' into a 'Speculative' container
 newtype WrappedFoldable f a = WrappedFoldable { getWrappedFoldable :: f a } 
     deriving (Functor, Foldable, Traversable)
 
@@ -200,6 +207,7 @@ instance (Typeable1 f, Data (f a), Data a) => Data (WrappedFoldable f a) where
     dataTypeOf _ = wrappedDataType
     dataCast1 f = gcast1 f
 
+-- | Provides a 'Speculative' container that doesn't actually speculate.
 newtype WithoutSpeculation f a = WithoutSpeculation { getWithoutSpeculation :: f a } 
     deriving (Functor, Foldable, Traversable)
 

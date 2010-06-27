@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.1.0
+version:        0.2.0
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -68,8 +68,6 @@ library
 
   build-depends:
     base >= 4 && < 6,
-    containers >= 0.2.0.1,
-    array >= 0.2 && < 0.4,
     parallel >= 2.2 && < 2.3,
     stm >= 2.1 && < 2.2
 

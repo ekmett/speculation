@@ -1,25 +1,19 @@
-{-# LANGUAGE BangPatterns, FlexibleContexts, DeriveFoldable, DeriveFunctor, DeriveTraversable #-}
+{-# LANGUAGE BangPatterns #-}
 module Control.Concurrent.Speculation
     ( spec
     , spec'
     , evaluated
     , specFoldr
     , specFoldl
-    , Speculative(..)
-    , WrappedFoldable(..)
-    , WithoutSpeculation(..)
+    , specFoldr1
+    , specFoldl1
+    , specFoldrN
+    , specFoldlN
     ) where
 
 import Prelude hiding (foldl, foldl1, foldr, foldr1)
-import Data.Array
 import Data.Ix ()
 import Data.Foldable
-import Data.Traversable
-import Data.IntMap (IntMap)
-import Data.Map (Map)
-import Data.Set (Set)
-import Data.Sequence (Seq)
-import Data.Data
 import Control.Parallel (par)
 
 import Data.Bits
@@ -98,7 +92,7 @@ spec' guess f a =
 --
 -- > specFoldr = specFoldrN 0
 
-specFoldr :: (Speculative f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+specFoldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 specFoldr = specFoldrN 0
 {-# INLINE specFoldr #-}
 
@@ -111,134 +105,58 @@ specFoldr = specFoldrN 0
 --
 -- > specFoldl = specFoldlN 0
 
-specFoldl  :: (Speculative f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
+specFoldl  :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 specFoldl = specFoldlN 0
 {-# INLINE specFoldl #-}
 
-class Foldable f => Speculative f where
-    -- | 'specFoldr1' is to 'foldr1'' as 'specFoldr' is to 'foldr''
-    specFoldr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
+-- | 'specFoldr1' is to 'foldr1'' as 'specFoldr' is to 'foldr''
+specFoldr1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
+specFoldr1 g f = specFoldr1List g f . toList
+{-# INLINE specFoldr1 #-}
 
-    -- | Given a valid estimator @g@, @'specFoldrN' n g f z xs@ yields the same answer as @'foldr' f z xs@.
-    -- 
-    -- @g m@ should supply an estimate of the value returned from folding over the last @m - n@ elements of the container.
-    specFoldrN :: Eq b => Int -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
-
-    -- | 'specFoldl1' is to 'foldl1'' as 'specFoldl' is to 'foldl''
-    specFoldl1 :: Eq a => (Int -> a) -> (a -> a -> a) -> f a -> a
-
-    -- | Given a valid estimator @g@, @'specFoldlN' n g f z xs@ yields the same answer as @'foldl' f z xs@.
-    -- 
-    -- @g m@ should supply an estimate of the value returned from folding over the first @m - n@ elements of the container.
-    specFoldlN :: Eq b => Int -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
-
-    specFoldr1 g f = specFoldr1 g f . toList
-    specFoldrN n g f z = specFoldrN n g f z . toList
-
-    specFoldl1 g f = specFoldl1 g f . toList
-    specFoldlN n g f z = specFoldlN n g f z . toList
-
-errorEmptyStructure :: String -> a
-errorEmptyStructure f = error $ f ++ ": error empty structure"
-
-instance Speculative [] where
-    specFoldr1 g f = go 0  
+specFoldr1List :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> a
+specFoldr1List g f = go 0  
       where
         go _ []  = errorEmptyStructure "specFoldr1"
         go _ [x] = x
         go !n (x:xs) = n' `seq` spec' (g n') (f x) (go n' xs)
           where 
             n' = n + 1
+{-# INLINE specFoldr1List #-}
 
-    specFoldrN _ _ _ z [] = z
-    specFoldrN !n g f z (x:xs) = n' `seq` spec' (g n') (f x) (specFoldrN n' g f z xs)
+-- | Given a valid estimator @g@, @'specFoldrN' n g f z xs@ yields the same answer as @'foldr' f z xs@.
+-- 
+-- @g m@ should supply an estimate of the value returned from folding over the last @m - n@ elements of the container.
+specFoldrN :: (Foldable f, Eq b) => Int -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+specFoldrN n0 g f z = go n0 . toList
+    where
+        go _ [] = z
+        go !n (x:xs) = n' `seq` spec' (g n') (f x) (go n' xs)
+          where 
+            n' = n + 1
+{-# INLINE specFoldrN #-}
+
+-- | 'specFoldl1' is to 'foldl1'' as 'specFoldl' is to 'foldl''
+specFoldl1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
+specFoldl1 g f = specFoldl1List g f . toList
+{-# INLINE specFoldl1 #-}
+
+specFoldl1List :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> a
+specFoldl1List _ _ []     = errorEmptyStructure "specFoldl1"
+specFoldl1List g f (x:xs) = specFoldlN 1 g f x xs
+{-# INLINE specFoldl1List #-}
+
+-- | Given a valid estimator @g@, @'specFoldlN' n g f z xs@ yields the same answer as @'foldl' f z xs@.
+-- 
+-- @g m@ should supply an estimate of the value returned from folding over the first @m - n@ elements of the container.
+specFoldlN :: (Foldable f, Eq b) => Int -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
+specFoldlN n0 g f z0 = go n0 z0 . toList
+  where
+    go _ z [] = z
+    go !n z (x:xs) = n' `seq` spec' (g n') (\z' -> go n' z' xs) (f z x)
       where 
         n' = n + 1
-        
-    specFoldl1 _ _ []     = errorEmptyStructure "specFoldl1"
-    specFoldl1 g f (x:xs) = specFoldlN 1 g f x xs
-    specFoldlN  _ _ _ z [] = z
-    specFoldlN !n g f z (x:xs) = n' `seq` spec' (g n') (\z' -> specFoldlN n' g f z' xs) (f z x)
-      where 
-        n' = n + 1
+{-# INLINE specFoldlN #-}
 
--- speculation never helps with at most one element
-instance Speculative Maybe where
-    specFoldr1 _   = foldr1
-    specFoldrN _ _ = foldr
-    specFoldl1 _   = foldl1
-    specFoldlN _ _ = foldl
-
-instance Ix i => Speculative (Array i)
-instance Speculative Set
-instance Speculative (Map a)
-instance Speculative IntMap
-instance Speculative Seq
-
--- | Transform an arbitrary 'Foldable' into a 'Speculative' container
-newtype WrappedFoldable f a = WrappedFoldable { getWrappedFoldable :: f a } 
-    deriving (Functor, Foldable, Traversable)
-
-instance Foldable f => Speculative (WrappedFoldable f)
-
-instance Typeable1 f => Typeable1 (WrappedFoldable f) where
-    typeOf1 tfa = mkTyConApp wrappedTyCon [typeOf1 (undefined `asArgsType` tfa)]
-        where asArgsType :: f a -> t f a -> f a
-              asArgsType = const
-    
-wrappedTyCon :: TyCon
-wrappedTyCon = mkTyCon "Control.Concurrent.Speculation.WrappedFoldable"
-{-# NOINLINE wrappedTyCon #-}
-
-wrappedConstr :: Constr
-wrappedConstr = mkConstr wrappedDataType "WrappedFoldable" [] Prefix
-{-# NOINLINE wrappedConstr #-}
-
-wrappedDataType :: DataType
-wrappedDataType = mkDataType "Control.Concurrent.Speculation.WrappedFoldable" [wrappedConstr]
-{-# NOINLINE wrappedDataType #-}
-
-instance (Typeable1 f, Data (f a), Data a) => Data (WrappedFoldable f a) where
-    gfoldl f z (WrappedFoldable a) = z WrappedFoldable `f` a
-    toConstr _ = wrappedConstr
-    gunfold k z c = case constrIndex c of
-        1 -> k (z WrappedFoldable)
-        _ -> error "gunfold"
-    dataTypeOf _ = wrappedDataType
-    dataCast1 f = gcast1 f
-
--- | Provides a 'Speculative' container that doesn't actually speculate.
-newtype WithoutSpeculation f a = WithoutSpeculation { getWithoutSpeculation :: f a } 
-    deriving (Functor, Foldable, Traversable)
-
-instance Typeable1 f => Typeable1 (WithoutSpeculation f) where
-    typeOf1 tfa = mkTyConApp withoutTyCon [typeOf1 (undefined `asArgsType` tfa)]
-        where asArgsType :: f a -> t f a -> f a
-              asArgsType = const
-
-instance Foldable f => Speculative (WithoutSpeculation f) where
-    specFoldr1 _   = foldr1
-    specFoldrN _ _ = foldr
-    specFoldl1 _   = foldl1
-    specFoldlN _ _ = foldl
-
-withoutTyCon :: TyCon
-withoutTyCon = mkTyCon "Control.Concurrent.Speculation.WithoutSpeculation"
-{-# NOINLINE withoutTyCon #-}
-
-withoutConstr :: Constr
-withoutConstr = mkConstr withoutDataType "WithoutSpeculation" [] Prefix
-{-# NOINLINE withoutConstr #-}
-
-withoutDataType :: DataType
-withoutDataType = mkDataType "Control.Concurrent.Speculation.WithoutSpeculation" [withoutConstr]
-{-# NOINLINE withoutDataType #-}
-
-instance (Typeable1 f, Data (f a), Data a) => Data (WithoutSpeculation f a) where
-    gfoldl f z (WithoutSpeculation a) = z WithoutSpeculation `f` a
-    toConstr _ = withoutConstr
-    gunfold k z c = case constrIndex c of
-        1 -> k (z WithoutSpeculation)
-        _ -> error "gunfold"
-    dataTypeOf _ = withoutDataType
-    dataCast1 f = gcast1 f
+errorEmptyStructure :: String -> a
+errorEmptyStructure f = error $ f ++ ": error empty structure"

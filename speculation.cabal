@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.6.0
+version:        0.6.1
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -44,7 +44,7 @@ description:
  . 
  /Changes in 0.6.0:/
  .
- * Upgraded the comparisons used by the STM combinators STM actions, so they can check for other STM side-effects.
+ * Upgraded the comparisons used by the STM combinators to STM actions, so they can check for other STM side-effects.
  .
  /Changes in 0.5.1:/
  . 

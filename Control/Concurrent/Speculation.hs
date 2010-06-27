@@ -179,8 +179,14 @@ specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (liftM2 (==))
 {-# INLINE specOnSTM' #-}
 
-data SpeculationException = SpeculationException deriving (Show,Eq,Typeable)
+-- | throwing an SpeculationException while you are evaluating a specSTM transaction will cause
+-- the current computation to abort, but if the current computation is a speculation, it will
+-- resume the unspeculated @f $! a@ computation instead. This can be used the moment you find
+-- yourself in a known unreachable speculative state. 
+data SpeculationException = SpeculationException deriving (Eq,Typeable)
 instance Exception SpeculationException
+instance Show SpeculationException where
+    showsPrec _ _ = showString "speculation aborted"
 
 -- | Used to inspect tag bits
 data Box a = Box a

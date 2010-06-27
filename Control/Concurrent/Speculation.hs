@@ -165,12 +165,12 @@ specBySTM' cmp g f a = a `par`
         _ -> throw e            -- this is a bigger problem
 {-# INLINE specBySTM' #-}
 
--- | 'specBySTM' . 'on' (==)'
+-- | @'specBySTM' . 'on' (==)@
 specOnSTM :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM = specBySTM . on (==)
 {-# INLINE specOnSTM #-}
 
--- | 'specBySTM'' . 'on' (==)'
+-- | @'specBySTM'' . 'on' (==)@
 specOnSTM' :: Eq c => (a -> c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (==)
 {-# INLINE specOnSTM' #-}

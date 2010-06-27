@@ -15,23 +15,18 @@ module Control.Concurrent.Speculation
     , specOnSTM'
     , specBySTM
     , specBySTM'
-    -- * Throw to break out of current speculation
-    , SpeculationException
     -- * Determining if a closure is evaluated
     , unsafeGetTagBits
     , unsafeIsEvaluated
     ) where
 
 import Control.Concurrent.STM
-import Control.Exception (Exception, fromException, throwIO)
 import Control.Parallel (par)
-import Control.Monad (liftM2)
-import Data.Typeable (Typeable)
+import Control.Monad (liftM2, unless)
 import Data.Function (on)
 import Data.Bits ((.&.))
 import Foreign (sizeOf)
 import Unsafe.Coerce (unsafeCoerce)
-import GHC.Conc (unsafeIOToSTM)
 
 -- * Basic speculation
 
@@ -77,9 +72,9 @@ spec' = specBy' (==)
 
 -- | 'spec' with a user defined comparison function
 specBy :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
-specBy cmp g f a
+specBy cmp guess f a
     | unsafeIsEvaluated a = f a
-    | otherwise = specBy' cmp g f a
+    | otherwise = specBy' cmp guess f a
 {-# INLINE specBy #-}
 
 -- | 'spec'' with a user defined comparison function
@@ -148,31 +143,23 @@ specSTM' = specBySTM' (returning (==))
 
 -- | 'specSTM' using a user defined comparison function
 specBySTM :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM cmp g f a 
+specBySTM cmp guess f a 
     | unsafeIsEvaluated a = f a 
-    | otherwise   = specBySTM' cmp g f a
+    | otherwise   = specBySTM' cmp guess f a
 {-# INLINE specBySTM #-}
 
 -- | 'specSTM'' using a user defined comparison function
 specBySTM' :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM' cmp g f a = a `par` 
-    let 
-      try = do
-        g' <- g
-        result <- f g'
-        test <- cmp g' a
-        if test
-          then return result
-          else throwSTM SpeculationException
-    in 
-      try `catchSTM` \e -> case fromException e of
-        Just SpeculationException -> f a        -- rerun with alternative input
-        _                         -> throwSTM e -- this is a bigger problem
-      -- try `orElse` f a -- Safer, but slower?
+specBySTM' cmp mguess f a = a `par` do
+    guess <- mguess
+    result <- f guess
+    -- rendezvous with a
+    matching <- cmp guess a 
+    unless matching retry 
+    return result
+  `orElse` 
+    f a 
 {-# INLINE specBySTM' #-}
-
-throwSTM :: Exception e => e -> STM a
-throwSTM = unsafeIOToSTM . throwIO
 
 -- | @'specBySTM' . 'on' (==)@
 specOnSTM :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
@@ -183,15 +170,6 @@ specOnSTM = specBySTM . on (liftM2 (==))
 specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (liftM2 (==))
 {-# INLINE specOnSTM' #-}
-
--- | throwing an SpeculationException while you are evaluating a specSTM transaction will cause
--- the current computation to abort, but if the current computation is a speculation, it will
--- resume the unspeculated @f $! a@ computation instead. This can be used the moment you find
--- yourself in a known unreachable speculative state. 
-data SpeculationException = SpeculationException deriving (Eq,Typeable)
-instance Exception SpeculationException
-instance Show SpeculationException where
-    showsPrec _ _ = showString "speculation aborted"
 
 -- | Used to inspect tag bits
 data Box a = Box a

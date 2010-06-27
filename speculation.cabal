@@ -44,15 +44,15 @@ description:
  . 
  /Changes in 0.6.1:/
  .
- * Changed @'throw' 'SpeculationException'@ to @'throwSTM' 'SpeculationException'@, to ensure effect ordering
+ * Changed @'throw' 'SpeculationException'@ to 'retry'
  .
  /Changes in 0.6.0:/
  .
- * Upgraded the comparisons used by the STM combinators to STM actions, so they can check for other STM side-effects.
+ * Upgraded the comparisons used by the STM combinators to STM actions, so they can check other STM state.
  .
  /Changes in 0.5.1:/
  . 
- * Exposed unsafeGetTagBits and unsafeIsEvaluated
+ * Exposed 'unsafeGetTagBits' and 'unsafeIsEvaluated'
 
 copyright:          (c) 2010 Edward A. Kmett
 build-type:         Simple

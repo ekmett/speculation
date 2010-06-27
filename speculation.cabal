@@ -1,0 +1,27 @@
+name:           speculation
+version:        0.0.0
+license:        BSD3
+license-file:   LICENSE
+author:         Edward A. Kmett
+maintainer:     Edward A. Kmett <ekmett@gmail.com>
+stability:      experimental
+homepage:       http://comonad.com/reader
+category:       Concurrency
+synopsis:       A framework for speculative evaluation
+description:    A framework for speculative evaluation
+copyright:      (c) 2010 Edward A. Kmett
+build-type:     Simple
+cabal-version:  >=1.2
+tested-with:    GHC==6.12.1
+
+library
+  ghc-options: -Wall
+
+  build-depends:
+    base >= 4 && < 6, 
+    containers >= 0.2.0.1,
+    array >= 0.2 && < 0.4,
+    parallel >= 2.2 && < 2.3
+
+  exposed-modules:
+    Control.Concurrent.Speculation

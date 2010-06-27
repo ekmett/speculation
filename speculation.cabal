@@ -1,11 +1,11 @@
 name:           speculation
-version:        0.0.0
+version:        0.0.1
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
 maintainer:     Edward A. Kmett <ekmett@gmail.com>
 stability:      experimental
-homepage:       http://comonad.com/reader
+homepage:       http://github.com/ekmett/speculation
 category:       Concurrency
 synopsis:       A framework for safe, programmable, speculative parallelism
 description:    A framework for safe, programmable, speculative parallelism, loosely based on

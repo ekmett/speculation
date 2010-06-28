@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Main where
 
 import Prelude hiding ((||),(&&)) 
@@ -20,5 +21,7 @@ tests =
     [ testGroup "cases" $ zipWith (testCase . show) [1 :: Int ..] $
         [] 
     , testGroup "properties" $ zipWith (testProperty . show) [1 :: Int ..] $ 
-        [ property $ \ a -> spec a (*2) a == ((*2) $! a :: Int) ] 
+        [ property $ \ a -> spec a (*2) a == ((*2) a :: Int)  -- unevaluated
+        , property $ \ !a -> spec a (*2) a == ((*2) $! a :: Int) -- evaluated
+        ] 
     ]

@@ -1,7 +1,6 @@
 module Main where
 
 import Criterion.Main
-import Criterion
 
 fib :: Int -> Int
 fib 0 = 0

@@ -122,7 +122,7 @@ executable benchmark-speculation
   if !flag(benchmarks)
     buildable: False
   else
-    ghc-options: -Wall 
+    ghc-options: -Wall -threaded
     if flag(optimize)
       ghc-options: -O2 -fspec-constr -funbox-strict-fields -fdicts-cheap
     build-depends:

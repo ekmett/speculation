@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 module Data.Foldable.Speculation
     ( 
     -- * Speculative folds
@@ -48,6 +48,7 @@ import Prelude hiding
     , elem, notElem, sum, product
     , minimum, maximum, concat, concatMap
     )
+
 import Data.Monoid
 import Data.Ix ()
 import Data.Function (on)

@@ -41,7 +41,7 @@ The worst-case timeline looks like:
                      [---- f a ----]
     [------- spec g f a -----------]
     
-Compare these to the timeline of @f $! a@:
+Compare these to the timeline of `f $! a`:
     [---- a -----]
                  [---- f a ----]
 

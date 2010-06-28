@@ -68,7 +68,7 @@ flag tests
 
 flag benchmarks
   description: Build the benchmarks
-  default:     False
+  default:     True
 
 flag hpc
   description: Use HPC for tests

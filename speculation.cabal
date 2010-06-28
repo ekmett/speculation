@@ -1,5 +1,5 @@
 name:           speculation
-version:        0.8.0.1
+version:        0.8.0.2
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -55,43 +55,43 @@ source-repository head
   location: http://github.com/ekmett/speculation.git
   branch:   master
 
-flag optimize
-  description: Enable optimizations
+flag lib
+  description: Build the library. Useful for speeding up the modify-build-test cycle.
   default:     True
 
 flag tests
   description: Build the tests
-  default:     True
+  default:     False
 
 flag benchmarks
   description: Build the benchmarks
+  default:     False
+
+flag optimize
+  description: Enable optimizations for the library and benchmarks
   default:     True
 
 flag hpc
   description: Use HPC for tests
   default:     True
 
-flag nolib
-  description: Don't build the library. Useful for speeding up the modify-build-test cycle.
-  default:     False
 
 library
-  ghc-options: -Wall
-
-  if flag(optimize)
-    ghc-options: -funbox-strict-fields -O2 -fspec-constr -fdicts-cheap
-
-  if flag(nolib)
+  if !flag(lib)
     buildable: False
+  else 
+    ghc-options: -Wall
+    if flag(optimize)
+      ghc-options: -funbox-strict-fields -O2 -fspec-constr -fdicts-cheap
 
-  build-depends:
-    base >= 4 && < 6,
-    parallel >= 2.2 && < 2.3,
-    stm >= 2.1 && < 2.2
+    build-depends:
+      base >= 4 && < 6,
+      parallel >= 2.2 && < 2.3,
+      stm >= 2.1 && < 2.2
 
-  exposed-modules:
-    Control.Concurrent.Speculation
-    Data.Foldable.Speculation
+    exposed-modules:
+      Control.Concurrent.Speculation
+      Data.Foldable.Speculation
 
 executable test-speculation
   main-is: Test.hs
@@ -100,6 +100,7 @@ executable test-speculation
   else
     if flag(hpc)
       ghc-options: -fhpc
+      x-hpc: true
     ghc-options: -Wall
     build-depends:
       base >= 4 && < 6, 

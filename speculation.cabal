@@ -49,6 +49,7 @@ description:
 extra-source-files: 
     README.markdown
     CHANGELOG.markdown
+    ISSUES.markdown
 
 source-repository head
   type:     git

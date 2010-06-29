@@ -21,6 +21,7 @@ module Control.Concurrent.Speculation
     ) where
 
 import Control.Concurrent.STM
+import Control.Concurrent.Speculation.Internal (returning)
 import Control.Parallel (par)
 import Control.Monad (liftM2, unless)
 import Data.Function (on)
@@ -193,6 +194,3 @@ unsafeIsEvaluated :: a -> Bool
 unsafeIsEvaluated a = unsafeGetTagBits a /= 0
 {-# INLINE unsafeIsEvaluated #-}
 
-returning :: Monad m => (a -> b -> c) -> a -> b -> m c
-returning f a b = return (f a b)
-{-# INLINE returning #-}

@@ -56,6 +56,7 @@ import Data.Foldable (Foldable)
 import qualified Data.Foldable as Foldable
 import Control.Concurrent.STM
 import Control.Concurrent.Speculation
+import Control.Concurrent.Speculation.Internal
 import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
@@ -405,21 +406,3 @@ find = findBy (==)
 findBy :: Foldable t => (Maybe a -> Maybe a -> Bool) -> (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a 
 findBy cmp g p = getFirst . foldMapBy (on cmp getFirst) (First . g) (\x -> if p x then First (Just x) else First (Nothing))
 
-data Acc a = Acc {-# UNPACK #-} !Int a
-
-extractAcc :: Acc a -> a
-extractAcc (Acc _ a) = a 
-{-# INLINE extractAcc #-}
-
-data MaybeAcc a = JustAcc {-# UNPACK #-} !Int a | NothingAcc
-
-fromMaybeAcc :: a -> MaybeAcc a -> a 
-fromMaybeAcc _ (JustAcc _ a) = a
-fromMaybeAcc a _ = a
-{-# INLINE fromMaybeAcc #-}
-
-errorEmptyStructure :: String -> a
-errorEmptyStructure f = error $ f ++ ": error empty structure"
-
-returning :: Monad m => (a -> b -> c) -> a -> b -> m c
-returning f a b = return (f a b)

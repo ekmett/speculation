@@ -1,3 +1,8 @@
+/0.8.1/:
+ * Added Data.List.Foldable
+ * Added Data.Traversable.Foldable
+ * Fixed an off-by-one error in the arguments to the speculative fold estimators
+
 /0.8.0.2/:
 
  * changed tests and benchmarks to not build by default to work around corruption in the hackage db

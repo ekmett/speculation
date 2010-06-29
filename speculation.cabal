@@ -77,7 +77,6 @@ flag hpc
   description: Use HPC for tests
   default:     True
 
-
 library
   if !flag(lib)
     buildable: False
@@ -88,12 +87,14 @@ library
 
     build-depends:
       base >= 4 && < 6,
+      ghc-prim >= 0.2 && < 0.3,
       parallel >= 2.2 && < 2.3,
       stm >= 2.1 && < 2.2
 
     exposed-modules:
       Control.Concurrent.Speculation
       Data.Foldable.Speculation
+      Data.Traversable.Speculation
       Data.List.Speculation
     other-modules:
       Control.Concurrent.Speculation.Internal
@@ -109,6 +110,8 @@ executable test-speculation
     ghc-options: -Wall
     build-depends:
       base >= 4 && < 6, 
+      ghc-prim >= 0.2 && < 0.3,
+      parallel >= 2.2 && < 2.3,
       stm >= 2.1 && < 2.2,
       containers >= 0.3.0 && < 0.4,
       test-framework >= 0.2.4 && < 0.3,
@@ -120,6 +123,7 @@ executable test-speculation
       Control.Concurrent.Speculation.Internal
       Control.Concurrent.Speculation
       Data.Foldable.Speculation
+      Data.Traversable.Speculation
       Data.List.Speculation
 
 executable benchmark-speculation
@@ -132,6 +136,8 @@ executable benchmark-speculation
       ghc-options: -O2 -fspec-constr -funbox-strict-fields -fdicts-cheap
     build-depends:
       base >= 4 && < 6, 
+      ghc-prim >= 0.2 && < 0.3,
+      parallel >= 2.2 && < 2.3,
       stm >= 2.1 && < 2.2,
       containers >= 0.3.0 && < 0.4,
       criterion >= 0.5 && < 0.6
@@ -139,4 +145,5 @@ executable benchmark-speculation
       Control.Concurrent.Speculation.Internal
       Control.Concurrent.Speculation
       Data.Foldable.Speculation
+      Data.Traversable.Speculation
       Data.List.Speculation

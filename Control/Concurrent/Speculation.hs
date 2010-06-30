@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, BangPatterns, DeriveDataTypeable #-}
 module Control.Concurrent.Speculation
-    ( 
+    (
     -- * Speculative application
       spec
     , spec'
@@ -31,8 +31,8 @@ import Data.Bits ((.&.))
 import Foreign (sizeOf)
 import Unsafe.Coerce (unsafeCoerce)
 -- dynamic pointer tagging is present on this platform
-#define TAGGED 
-#endif 
+#define TAGGED
+#endif
 
 -- * Basic speculation
 
@@ -40,7 +40,7 @@ import Unsafe.Coerce (unsafeCoerce)
 --
 -- Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
 --
--- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. 
+-- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
 --
 -- However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
 -- wrong, you risk evaluating the function twice.
@@ -52,7 +52,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- > [---- f g ----]
 -- >    [----- a -----]
 -- > [-- spec g f a --]
--- 
+--
 -- The worst-case timeline looks like:
 --
 -- > [---- f g ----]
@@ -66,7 +66,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- >              [---- f a ----]
 
 spec :: Eq a => a -> (a -> b) -> a -> b
-spec = specBy (==) 
+spec = specBy (==)
 {-# INLINE spec #-}
 
 -- | Unlike 'spec', this version does not check to see if the argument has already been evaluated. This can save
@@ -85,12 +85,12 @@ specBy cmp guess f a
 
 -- | 'spec'' with a user defined comparison function
 specBy' :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
-specBy' cmp guess f a = 
-    speculation `par` 
+specBy' cmp guess f a =
+    speculation `par`
         if cmp guess a
         then speculation
         else f a
-    where 
+    where
         speculation = f guess
 {-# INLINE specBy' #-}
 
@@ -106,12 +106,12 @@ specOn' = specBy' . on (==)
 
 -- * STM-based speculation
 
--- | @'specSTM' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise the side-effects 
+-- | @'specSTM' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise the side-effects
 -- of the current STM transaction are rolled back and @f a@ is evaluated.
---   
+--
 -- If the argument @a@ is already evaluated, we don\'t bother to perform @f g@ at all.
 --
--- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. 
+-- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
 --
 -- However, if the guess isn\'t available more cheaply than the actual answer then this saves no work, and if the guess is
 -- wrong, you risk evaluating the function twice.
@@ -126,10 +126,10 @@ specOn' = specBy' . on (==)
 --
 -- The worst-case timeline looks like:
 --
--- > [------ f g ------] 
+-- > [------ f g ------]
 -- >     [------- a -------]
 -- >                       [-- rollback --]
--- >                                      [------ f a ------]     
+-- >                                      [------ f a ------]
 -- > [------------------ spec g f a ------------------------]
 --
 -- Compare these to the timeline of @f $! a@:
@@ -149,8 +149,8 @@ specSTM' = specBySTM' (returning (==))
 
 -- | 'specSTM' using a user defined comparison function
 specBySTM :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM cmp guess f a 
-    | unsafeIsEvaluated a = f a 
+specBySTM cmp guess f a
+    | unsafeIsEvaluated a = f a
     | otherwise   = specBySTM' cmp guess f a
 {-# INLINE specBySTM #-}
 
@@ -160,11 +160,11 @@ specBySTM' cmp mguess f a = a `par` do
     guess <- mguess
     result <- f guess
     -- rendezvous with a
-    matching <- cmp guess a 
-    unless matching retry 
+    matching <- cmp guess a
+    unless matching retry
     return result
-  `orElse` 
-    f a 
+  `orElse`
+    f a
 {-# INLINE specBySTM' #-}
 
 -- | @'specBySTM' . 'on' (==)@

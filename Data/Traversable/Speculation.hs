@@ -1,21 +1,44 @@
-{-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples #-}
+{-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples, BangPatterns #-}
 module Data.Traversable.Speculation
-    ( mapAccumL, mapAccumLBy
+    (
+    -- * Traversable
+    -- ** Applicative Traversals
+      traverse, traverseBy
+    , for, forBy
+    , sequenceA, sequenceByA
+    -- ** Monadic traversals
+    , mapM, mapByM
+    , sequence, sequenceBy
+    , forM, forByM
+    -- ** STM-based traversals with transactional rollback
+    , mapSTM, mapBySTM
+    , forSTM, forBySTM
+--    , sequenceSTM, sequenceBySTM
+    -- * Accumulating parameters
+    , mapAccumL, mapAccumLBy
     , mapAccumR, mapAccumRBy
     ) where
 
+import Prelude hiding (mapM, sequence)
 import GHC.Prim
 import GHC.Types
 import Data.Traversable (Traversable)
 import qualified Data.Traversable as Traversable
 import Control.Applicative
+import Control.Concurrent.STM
 import Control.Concurrent.Speculation
+import Control.Concurrent.Speculation.Internal
+
+acc :: Int# -> a -> Acc a
+acc i a = Acc (I# i) a
+{-# INLINE acc #-}
 
 data IntAccumL s a = IntAccumL (Int# -> s -> (# Int#, s, a #))
 
 runIntAccumL :: IntAccumL s a -> Int -> s -> (s, a)
 runIntAccumL (IntAccumL m) (I# i) s = case m i s of
     (# _, s1, a #) -> (s1, a)
+{-# INLINE runIntAccumL #-}
 
 instance Functor (IntAccumL s) where
     fmap f (IntAccumL m) = IntAccumL  (\i s -> case m i s of
@@ -31,6 +54,7 @@ instance Applicative (IntAccumL s) where
     
 mapAccumL :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL = mapAccumLBy (==)
+{-# INLINE mapAccumL #-}
 
 mapAccumLBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumLBy cmp g f z xs = runIntAccumL (Traversable.traverse go xs) 0 z
@@ -38,12 +62,14 @@ mapAccumLBy cmp g f z xs = runIntAccumL (Traversable.traverse go xs) 0 z
     go b = IntAccumL (\n a -> 
             let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
+{-# INLINE mapAccumLBy #-}
 
 data IntAccumR s a = IntAccumR (Int# -> s -> (# Int#, s, a #))
 
 runIntAccumR :: IntAccumR s a -> Int -> s -> (s, a)
 runIntAccumR (IntAccumR m) (I# i) s = case m i s of
     (# _, s1, a #) -> (s1, a)
+{-# INLINE runIntAccumR #-}
 
 instance Functor (IntAccumR s) where
     fmap f (IntAccumR m) = IntAccumR  (\i s -> case m i s of
@@ -59,6 +85,7 @@ instance Applicative (IntAccumR s) where
 
 mapAccumR :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumR = mapAccumRBy (==)
+{-# INLINE mapAccumR #-}
 
 mapAccumRBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumRBy cmp g f z xs = runIntAccumR (Traversable.traverse go xs) 0 z
@@ -66,52 +93,109 @@ mapAccumRBy cmp g f z xs = runIntAccumR (Traversable.traverse go xs) 0 z
     go b = IntAccumR (\n a -> 
             let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
+{-# INLINE mapAccumRBy #-}
 
-{-
-traverse :: (Traversable t, Applicative f, Eq (f b)) => (Int -> f b) -> (a -> f b) -> t a -> f (t b)
-traverse = traverseBy (==)
+-- applicative composition with a strict integer state applicative
+newtype AccT m a = AccT (Int# -> Acc (m a))
 
-traverseBy :: (Traversable t, Applicative f) => (Int -> f b) -> (a -> f b) -> t a -> f (t b)
--}
+runAccT :: Applicative m => AccT m a -> Int -> m a
+runAccT (AccT m) (I# i) = extractAcc (m i)
+{-# INLINE runAccT #-}
 
--- note applicative composition doesn't give StateT
--- There is a difference between StateT s m and State s (m a)
--- 
-{-
-newtype AccT m a = AccT (Int# -> m (Acc a))
+instance Functor f => Functor (AccT f) where
+    fmap f (AccT m) = AccT (\i# -> case m i# of Acc i a -> Acc i (fmap f a))
 
-instance Functor f => Applicative (AccT s f) where
-    fmap f (AccT m) = AccT (fmap (fmap f) . m)
+instance Applicative f => Applicative (AccT f) where
+    pure a = AccT (\i -> Acc (I# i) (pure a))
+    AccT mf <*> AccT ma = AccT (\i0# -> 
+        let !(Acc !(I# i1#) f) = mf i0#
+            !(Acc i2 a) = ma i1#
+        in  Acc i2 (f <*> a))
 
-instance Applicative m => Applicative (AccT s m) where
-    pure a = AccT (\i -> return (Acc i a))
-    AccT mf <*> AccT ma = AccT (\i -> 
-        let maccf = mf i 
+newtype IntStateT m a = IntStateT { runIntStateT :: Int# -> m (Acc a) } 
+
+instance Monad m => Monad (IntStateT m) where
+    return a = IntStateT (\i -> return (acc i a))
+    IntStateT mm >>= k = IntStateT $ \i0 -> do
+        Acc (I# i1) m <- mm i0
+        runIntStateT (k m) i1
     
+traverse  :: (Traversable t, Applicative f, Eq a) => (Int -> a) -> (a -> f b) -> t a -> f (t b)
+traverse = traverseBy (==)
+{-# INLINE traverse #-}
 
-        m (Acc (a -> b)) -> m (Acc a)
--}
+traverseBy :: (Traversable t, Applicative f) => (a -> a -> Bool) -> (Int -> a) -> (a -> f b) -> t a -> f (t b)
+traverseBy cmp g f xs = runAccT (Traversable.traverse go xs) 0
+  where
+    -- go :: a -> AccT f a
+    go a = AccT $ \i -> acc (i +# 1#) $ specBy cmp (g (I# i)) f a
+{-# INLINE traverseBy #-}
+
+mapM :: (Traversable t, Monad m, Eq a) => (Int -> a) -> (a -> m b) -> t a -> m (t b)
+mapM = mapByM (==)
+{-# INLINE mapM #-}
+
+mapByM :: (Traversable t, Monad m) => (a -> a -> Bool) -> (Int -> a) -> (a -> m b) -> t a -> m (t b)
+mapByM cmp g f = unwrapMonad . traverseBy cmp g (WrapMonad . f)
+{-# INLINE mapByM #-}
+
+mapSTM :: (Traversable t, Eq a) => (Int -> STM a) -> (a -> STM b) -> t a -> STM (t b)
+mapSTM = mapBySTM (returning (==))
+{-# INLINE mapSTM #-}
+
+mapBySTM :: Traversable t => (a -> a -> STM Bool) -> (Int -> STM a) -> (a -> STM b) -> t a -> STM (t b)
+mapBySTM cmp g f xs = unwrapMonad (runAccT (Traversable.traverse go xs) 0)
+  where
+    go a = AccT $ \i -> acc (i +# 1#) $ WrapMonad $ specBySTM cmp (g (I# i)) f a
+{-# INLINE mapBySTM #-}
+
+      
+sequenceA :: (Traversable t, Applicative f, Eq (f a)) => (Int -> f a) -> t (f a) -> f (t a)
+sequenceA g = traverse g id
+{-# INLINE sequenceA #-}
+
+sequenceByA :: (Traversable t, Applicative f) => (f a -> f a -> Bool) -> (Int -> f a) -> t (f a) -> f (t a)
+sequenceByA cmp g = traverseBy cmp g id
+{-# INLINE sequenceByA #-}
+
+sequence   :: (Traversable t, Monad m, Eq (m a)) => (Int -> m a) -> t (m a) -> m (t a)
+sequence g = mapM g id
+{-# INLINE sequence #-}
+
+sequenceBy :: (Traversable t, Monad m) => (m a -> m a -> Bool) -> (Int -> m a) -> t (m a) -> m (t a)
+sequenceBy cmp g = mapByM cmp g id
+{-# INLINE sequenceBy #-}
 
 {-
-traverseBy :: (Traversable t, Applicative f) => (f b -> f b -> Bool) -> (Int -> f b) -> (a -> f b) -> t a -> f (t b)
-sequence   :: (Traversable t, Monad m, Eq (m a)) => (Int -> m a) -> t (m a) -> m (t a)
-sequenceBy :: (Traversable t, Monad m) => (m a -> m a -> Bool) -> (Int -> m a) -> t (m a) -> m (t a)
-sequenceA   :: (Traversable t, Applicative f, Eq (f a)) => (Int -> f a) -> t (f a) -> f (t a)
-sequenceByA :: (Traversable t, Applicative f) => (f a -> f a -> Bool) -> (Int -> f a) -> t (f a) -> f (t a)
 sequenceSTM   :: (Traversable t, Eq a) => (Int -> STM a) -> t (STM a) -> STM (t a)
+sequenceSTM g = mapSTM g id
+{-# INLINE sequenceSTM #-}
+
 sequenceBySTM :: Traversable t => (a -> a -> STM Bool) -> (Int -> STM a) -> t (STM a) -> STM (t a)
-mapM :: (Traversable t, Monad m, Eq (m b)) => (Int -> m b) -> (a -> m b) -> t a -> m (t b)
-mapByM :: (Traversable t, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> (a -> m b) -> t a -> m (t b)
-mapSTM :: (Traversable t, Eq b) => (Int -> STM b) -> (a -> STM b) -> t a -> STM (t b)
-mapBySTM :: Traversable t => (b -> b -> STM Bool) -> (Int -> STM b) -> (a -> STM b) -> t a -> STM (t b)
-mapAccumR :: (Traversable t, Eq a, Eq c) => (Int -> (a, c)) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-mapAccumRBy :: Traversable t => ((a, c) -> (a, c) -> Bool) -> (Int -> (a, c)) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-mapAccumLBy :: Traversable t => ((a, c) -> (a, c) -> Bool) -> (Int -> (a, c)) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
-for :: (Traversable t, Applicative f, Eq (f b)) => (Int -> f b) -> t a -> (a -> f b) -> f (t b)
-forBy :: (Traversable t, Applicative f) => (f b -> f b -> Bool) -> (Int -> f b) -> t a -> (a -> f b) -> f (t b)
-forM :: (Traversable t, Monad m, Eq (m b)) => (Int -> m b) -> t a -> (a -> m b) -> m (t b)
-forByM :: (Traversable t, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> t a -> (a -> m b) -> m (t b)
-forSTM :: (Traversable t, Eq b) => (Int -> STM b) -> t a -> (a -> STM b) -> STM (t b)
-forBySTM :: Traversable t => (b -> b -> STM Bool) -> (Int -> STM b) -> t a -> (a -> STM b) -> STM (t b)
+sequenceBySTM cmp g = mapBySTM cmp g id
+{-# INLINE sequenceBySTM #-}
 -}
 
+for :: (Traversable t, Applicative f, Eq a) => (Int -> a) -> t a -> (a -> f b) -> f (t b)
+for g = flip (traverse g)
+{-# INLINE for #-}
+
+forBy :: (Traversable t, Applicative f) => (a -> a -> Bool) -> (Int -> a) -> t a -> (a -> f b) -> f (t b)
+forBy cmp g = flip (traverseBy cmp g)
+{-# INLINE forBy #-}
+
+forM :: (Traversable t, Monad m, Eq a) => (Int -> a) -> t a -> (a -> m b) -> m (t b)
+forM g = flip (mapM g)
+{-# INLINE forM #-}
+
+forByM :: (Traversable t, Monad m) => (a -> a -> Bool) -> (Int -> a) -> t a -> (a -> m b) -> m (t b)
+forByM cmp g = flip (mapByM cmp g)
+{-# INLINE forByM #-}
+
+forSTM :: (Traversable t, Eq a) => (Int -> STM a) -> t a -> (a -> STM b) -> STM (t b)
+forSTM g = flip (mapSTM g)
+{-# INLINE forSTM #-}
+
+forBySTM :: Traversable t => (a -> a -> STM Bool) -> (Int -> STM a) -> t a -> (a -> STM b) -> STM (t b)
+forBySTM cmp g = flip (mapBySTM cmp g)
+{-# INLINE forBySTM #-}

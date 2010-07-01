@@ -29,29 +29,6 @@ import Control.Concurrent.STM
 import Control.Concurrent.Speculation
 import Control.Concurrent.Speculation.Internal
 
-acc :: Int# -> a -> Acc a
-acc i a = Acc (I# i) a
-{-# INLINE acc #-}
-
-data IntAccumL s a = IntAccumL (Int# -> s -> (# Int#, s, a #))
-
-runIntAccumL :: IntAccumL s a -> Int -> s -> (s, a)
-runIntAccumL (IntAccumL m) (I# i) s = case m i s of
-    (# _, s1, a #) -> (s1, a)
-{-# INLINE runIntAccumL #-}
-
-instance Functor (IntAccumL s) where
-    fmap f (IntAccumL m) = IntAccumL  (\i s -> case m i s of
-        (# i1, s1, a #) -> (# i1, s1, f a #))
-
-instance Applicative (IntAccumL s) where
-    pure a = IntAccumL (\i s -> (# i, s, a #))
-    IntAccumL mf <*> IntAccumL ma = IntAccumL (\i s ->
-        case mf i s of 
-            (# i1, s1, f #) ->
-                case ma i1 s1 of 
-                    (# i2, s2, a #) -> (# i2, s2, f a #))
-    
 mapAccumL :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL = mapAccumLBy (==)
 {-# INLINE mapAccumL #-}
@@ -63,25 +40,6 @@ mapAccumLBy cmp g f z xs = runIntAccumL (Traversable.traverse go xs) 0 z
             let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumLBy #-}
-
-data IntAccumR s a = IntAccumR (Int# -> s -> (# Int#, s, a #))
-
-runIntAccumR :: IntAccumR s a -> Int -> s -> (s, a)
-runIntAccumR (IntAccumR m) (I# i) s = case m i s of
-    (# _, s1, a #) -> (s1, a)
-{-# INLINE runIntAccumR #-}
-
-instance Functor (IntAccumR s) where
-    fmap f (IntAccumR m) = IntAccumR  (\i s -> case m i s of
-        (# i1, s1, a #) -> (# i1, s1, f a #))
-
-instance Applicative (IntAccumR s) where
-    pure a = IntAccumR (\i s -> (# i, s, a #))
-    IntAccumR mf <*> IntAccumR ma = IntAccumR (\i s ->
-        case ma i s of 
-            (# i1, s1, a #) ->
-                case mf i1 s1 of 
-                    (# i2, s2, f #) -> (# i2, s2, f a #))
 
 mapAccumR :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumR = mapAccumRBy (==)
@@ -95,31 +53,6 @@ mapAccumRBy cmp g f z xs = runIntAccumR (Traversable.traverse go xs) 0 z
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumRBy #-}
 
--- applicative composition with a strict integer state applicative
-newtype AccT m a = AccT (Int# -> Acc (m a))
-
-runAccT :: Applicative m => AccT m a -> Int -> m a
-runAccT (AccT m) (I# i) = extractAcc (m i)
-{-# INLINE runAccT #-}
-
-instance Functor f => Functor (AccT f) where
-    fmap f (AccT m) = AccT (\i# -> case m i# of Acc i a -> Acc i (fmap f a))
-
-instance Applicative f => Applicative (AccT f) where
-    pure a = AccT (\i -> Acc (I# i) (pure a))
-    AccT mf <*> AccT ma = AccT (\i0# -> 
-        let !(Acc !(I# i1#) f) = mf i0#
-            !(Acc i2 a) = ma i1#
-        in  Acc i2 (f <*> a))
-
-newtype IntStateT m a = IntStateT { runIntStateT :: Int# -> m (Acc a) } 
-
-instance Monad m => Monad (IntStateT m) where
-    return a = IntStateT (\i -> return (acc i a))
-    IntStateT mm >>= k = IntStateT $ \i0 -> do
-        Acc (I# i1) m <- mm i0
-        runIntStateT (k m) i1
-    
 traverse  :: (Traversable t, Applicative f, Eq a) => (Int -> a) -> (a -> f b) -> t a -> f (t b)
 traverse = traverseBy (==)
 {-# INLINE traverse #-}
@@ -199,3 +132,64 @@ forSTM g = flip (mapSTM g)
 forBySTM :: Traversable t => (a -> a -> STM Bool) -> (Int -> STM a) -> t a -> (a -> STM b) -> STM (t b)
 forBySTM cmp g = flip (mapBySTM cmp g)
 {-# INLINE forBySTM #-}
+
+-- Utilities
+
+acc :: Int# -> a -> Acc a
+acc i a = Acc (I# i) a
+{-# INLINE acc #-}
+
+data IntAccumL s a = IntAccumL (Int# -> s -> (# Int#, s, a #))
+
+runIntAccumL :: IntAccumL s a -> Int -> s -> (s, a)
+runIntAccumL (IntAccumL m) (I# i) s = case m i s of
+    (# _, s1, a #) -> (s1, a)
+{-# INLINE runIntAccumL #-}
+
+instance Functor (IntAccumL s) where
+    fmap f (IntAccumL m) = IntAccumL  (\i s -> case m i s of
+        (# i1, s1, a #) -> (# i1, s1, f a #))
+
+instance Applicative (IntAccumL s) where
+    pure a = IntAccumL (\i s -> (# i, s, a #))
+    IntAccumL mf <*> IntAccumL ma = IntAccumL (\i s ->
+        case mf i s of 
+            (# i1, s1, f #) ->
+                case ma i1 s1 of 
+                    (# i2, s2, a #) -> (# i2, s2, f a #))
+
+data IntAccumR s a = IntAccumR (Int# -> s -> (# Int#, s, a #))
+
+runIntAccumR :: IntAccumR s a -> Int -> s -> (s, a)
+runIntAccumR (IntAccumR m) (I# i) s = case m i s of
+    (# _, s1, a #) -> (s1, a)
+{-# INLINE runIntAccumR #-}
+
+instance Functor (IntAccumR s) where
+    fmap f (IntAccumR m) = IntAccumR  (\i s -> case m i s of
+        (# i1, s1, a #) -> (# i1, s1, f a #))
+
+instance Applicative (IntAccumR s) where
+    pure a = IntAccumR (\i s -> (# i, s, a #))
+    IntAccumR mf <*> IntAccumR ma = IntAccumR (\i s ->
+        case ma i s of 
+            (# i1, s1, a #) ->
+                case mf i1 s1 of 
+                    (# i2, s2, f #) -> (# i2, s2, f a #))
+
+-- applicative composition with a strict integer state applicative
+newtype AccT m a = AccT (Int# -> Acc (m a))
+
+runAccT :: Applicative m => AccT m a -> Int -> m a
+runAccT (AccT m) (I# i) = extractAcc (m i)
+{-# INLINE runAccT #-}
+
+instance Functor f => Functor (AccT f) where
+    fmap f (AccT m) = AccT (\i# -> case m i# of Acc i a -> Acc i (fmap f a))
+
+instance Applicative f => Applicative (AccT f) where
+    pure a = AccT (\i -> Acc (I# i) (pure a))
+    AccT mf <*> AccT ma = AccT (\i0# -> 
+        let !(Acc !(I# i1#) f) = mf i0#
+            !(Acc i2 a) = ma i1#
+        in  Acc i2 (f <*> a))

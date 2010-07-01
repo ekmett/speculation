@@ -24,27 +24,45 @@ description:
  .
  For example:
  . 
- @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. 
+ @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. Under high load, since 'f g' is computed via the spark queue, the speculation will be skipped and you will obtain the same answer as 'f $! a'.
  .
  The best-case timeline looks like:
  .
- > [---- f g ----]
- >    [----- a -----]
- > [-- spec g f a --]
+ > foreground: [----- a -----]
+ > foreground:               [-]    (check g == a)
+ > spark:         [----- f g -----]
+ > overall:    [--- spec g f a ---]
  .
  The worst-case timeline looks like:
  .
- > [---- f g ----]
- >    [----- a -----]
- >                  [---- f a ----]
- > [------- spec g f a -----------]
+ > foreground: [----- a -----]
+ > foreground:               [-]               (check g == a)
+ > foreground:                 [---- f a ----]
+ > spark:         [----- f g -----]
+ > overall:    [-------- spec g f a ---------]
+ .
+ Note that, if @f g@ takes longer than a to compute, in the HEAD release of GHC, @f g@ will be collected and killed during garbage collection.
+ .
+ > foreground: [----- a -----]
+ > foreground:               [-]               (check g == a)
+ > foreground:                 [---- f a ----]
+ > spark:         [---- f g ----######         (#'s mark when this spark is collectable)
+ > overall:    [--------- spec g f a --------]
+ . 
+ Under high load:
+ .
+ > foreground: [----- a -----]
+ > foreground:               [-]               (check g == a)
+ > foreground:                 [---- f a ----]
+ > overall:    [-------- spec g f a ---------]
  .
  Compare these to the timeline of @f $! a@:
  .
- > [---- a -----]
- >              [---- f a ----]
+ > foreground: [----- a -----]
+ > foreground:               [---- f a ----]
+ > orverall:   [---------- f $! a ---------]
  .
- 'specSTM' provides a similar time table for STM actions, but also rolls back side-effects.
+ 'specSTM' provides a similar time table for STM actions, but also rolls back side-effects. The one unfortunate operational distinction is that it is forced to compute 'a' in the background thread and therefore degrades slightly less gracefully under load.
 
 extra-source-files: 
     README.markdown
@@ -93,6 +111,7 @@ library
 
     exposed-modules:
       Control.Concurrent.Speculation
+      Control.Morphism.Speculation
       Data.Foldable.Speculation
       Data.Traversable.Speculation
       Data.List.Speculation
@@ -122,6 +141,7 @@ executable test-speculation
     other-modules:
       Control.Concurrent.Speculation.Internal
       Control.Concurrent.Speculation
+      Control.Morphism.Speculation
       Data.Foldable.Speculation
       Data.Traversable.Speculation
       Data.List.Speculation
@@ -144,6 +164,7 @@ executable benchmark-speculation
     other-modules:
       Control.Concurrent.Speculation.Internal
       Control.Concurrent.Speculation
+      Control.Morphism.Speculation
       Data.Foldable.Speculation
       Data.Traversable.Speculation
       Data.List.Speculation

@@ -87,9 +87,15 @@ foldMap :: (Foldable f, Monoid m, Eq m) => (Int -> m) -> (a -> m) -> f a -> m
 foldMap = foldMapBy (==)
 {-# INLINE foldMap #-}
 
+-- | 'foldMap' using 'specBy'
 foldMapBy :: (Foldable f, Monoid m) => (m -> m -> Bool) -> (Int -> m) -> (a -> m) -> f a -> m
 foldMapBy cmp g f = foldrBy cmp g (mappend . f) mempty
 {-# INLINE foldMapBy #-}
+
+
+foldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+foldr = foldrBy (==)
+{-# INLINE foldr #-}
 
 -- | Given a valid estimator @g@, @'foldr' g f z xs@ yields the same answer as @'foldr'' f z xs@.
 --
@@ -97,16 +103,32 @@ foldMapBy cmp g f = foldrBy cmp g (mappend . f) mempty
 --
 -- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
 -- provide increased opportunities for parallelism.
-
-foldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
-foldr = foldrBy (==)
-{-# INLINE foldr #-}
-
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
   where 
     mf a (Acc n b) = Acc (n + 1) (specBy' cmp (g n) (f a) b)
 {-# INLINE foldrBy #-}
+
+
+{-
+-- Variations:
+-- These variations are not used because the values ot the left shouldn't affect the intermediate state of a right fold.
+--
+-- this version receiveds both the number of values remaining and the number so far
+
+foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> Int -> b) -> (a -> b -> b) -> b -> f a -> b
+foldrBy cmp g f z xs = Foldable.foldr mf (Acc 0 (const z)) xs 0
+  where 
+    mf a (Acc r b) !l = let l' = l + 1 in Acc (r + 1) (specBy' cmp (g l') (f a) (b l'))
+{-# INLINE foldrBy #-}
+
+-- this estimator receives the number of values to the left of the summation. 
+foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
+foldrBy cmp g f z xs = Foldable.foldr mf (const z) xs 0
+  where 
+    mf a b !i = let i' = i + 1 in specBy' cmp (g i') (f a) (b i')
+{-# INLINE foldrBy #-}
+-}
 
 foldlM :: (Foldable f, Monad m, Eq (m b)) => (Int -> m b) -> (b -> a -> m b) -> m b -> f a -> m b
 foldlM = foldlByM (==)
@@ -240,12 +262,12 @@ mapByM_ cmp g f = foldrBy cmp (\n -> g n >> return ()) ((>>) . f) (return ())
 -- | 'for_' is 'mapM_' with its arguments flipped.
 forM_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m c) -> t a -> (a -> m b) -> m ()
 forM_ g = flip (mapM_ g)
-{-# INLINE forM_#-}
+{-# INLINE forM_ #-}
 
 -- | 'for_' is 'mapM_' with its arguments flipped.
 forSTM_ :: Foldable t => STM Bool -> (Int -> STM c) -> t a -> (a -> STM b) -> STM ()
 forSTM_ chk g = flip (mapSTM_ chk g)
-{-# INLINE forSTM_#-}
+{-# INLINE forSTM_ #-}
 
 forByM_ :: (Foldable t, Monad m) => (m () -> m () -> Bool) -> (Int -> m c) -> t a -> (a -> m b) -> m ()
 forByM_ cmp g = flip (mapByM_ cmp g)

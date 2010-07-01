@@ -36,34 +36,43 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- * Basic speculation
 
--- | @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise @f a@ is evaluated.
+-- | @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. Under high load, since 'f g' is computed via the spark queue, the speculation will be skipped and you will obtain the same answer as 'f $! a'.
 --
--- Furthermore, if the argument has already been evaluated, we avoid sparking the parallel computation at all.
+--The best-case timeline looks like:
 --
--- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
---
--- However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is
--- wrong, you risk evaluating the function twice.
---
--- > spec a f a = f $! a
---
--- The best-case timeline looks like:
---
--- > [---- f g ----]
--- >    [----- a -----]
--- > [-- spec g f a --]
+-- > foreground: [----- a -----]
+-- > foreground:               [-]    (check g == a)
+-- > spark:         [----- f g -----]
+-- > overall:    [--- spec g f a ---]
 --
 -- The worst-case timeline looks like:
 --
--- > [---- f g ----]
--- >    [----- a -----]
--- >                  [---- f a ----]
--- > [------- spec g f a -----------]
+-- > foreground: [----- a -----]
+-- > foreground:               [-]               (check g == a)
+-- > foreground:                 [---- f a ----]
+-- > spark:         [----- f g -----]
+-- > overall:    [-------- spec g f a ---------]
+--
+-- Note that, if @f g@ takes longer than a to compute, in the HEAD release of GHC, @f g@ will be collected and killed during garbage collection.
+--
+-- > foreground: [----- a -----]
+-- > foreground:               [-]               (check g == a)
+-- > foreground:                 [---- f a ----]
+-- > spark:         [---- f g ----######         (#'s mark when this spark is collectable)
+-- > overall:    [--------- spec g f a --------]
+-- 
+-- Under high load:
+--
+-- > foreground: [----- a -----]
+-- > foreground:               [-]               (check g == a)
+-- > foreground:                 [---- f a ----]
+-- > overall:    [-------- spec g f a ---------]
 --
 -- Compare these to the timeline of @f $! a@:
 --
--- > [---- a -----]
--- >              [---- f a ----]
+-- > foreground: [----- a -----]
+-- > foreground:               [---- f a ----]
+-- > orverall:   [---------- f $! a ---------]
 
 spec :: Eq a => a -> (a -> b) -> a -> b
 spec = specBy (==)
@@ -106,36 +115,45 @@ specOn' = specBy' . on (==)
 
 -- * STM-based speculation
 
--- | @'specSTM' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned. Otherwise the side-effects
--- of the current STM transaction are rolled back and @f a@ is evaluated.
+-- | @'specSTM' g f a@ evaluates @fg = do g' <- g; f g'@, while forcing @a@, then if @g' == a@ then @fg@ is returned. Otherwise the side-effects of @fg@ are rolled back and @f a@ is evaluated. @g@ is allowed to be a monadic action, so that we can kickstart the computation of @a@ earlier.
 --
--- If the argument @a@ is already evaluated, we don\'t bother to perform @f g@ at all.
+-- If the argument @a@ is already evaluated, we don\'t bother to perform @fg@ at all.
 --
 -- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
 --
 -- However, if the guess isn\'t available more cheaply than the actual answer then this saves no work, and if the guess is
 -- wrong, you risk evaluating the function twice.
 --
--- > specSTM a f a = f $! a
---
 -- The best-case timeline looks like:
 --
--- > [------ f g ------]
--- >     [------- a -------]
--- > [--- specSTM g f a ---]
+-- > foreground: [--- g >>= f ---]
+-- > spark:          [------- a -------]
+-- > foreground:                       [-] (compare g' == a)
+-- > overall:    [---- specSTM g f a ----]
 --
 -- The worst-case timeline looks like:
 --
--- > [------ f g ------]
--- >     [------- a -------]
--- >                       [-- rollback --]
--- >                                      [------ f a ------]
--- > [------------------ spec g f a ------------------------]
+-- > foreground: [---- g >>= f ----]
+-- > spark:         [------- a -------]
+-- > foreground:                      [-] (check if g' == a)
+-- > foreground:                        [--] (rollback)
+-- > foreground:                           [------ f a ------]
+-- > overall:    [------------ specSTM g f a ----------------]
+--
+-- Under high load, 'specSTM' degrades less gracefully than 'spec':
+--
+-- > foreground: [---- g >>= f ----]
+-- > spark:                        [------- a -------]
+-- > foreground:                                     [-] (check if g' == a)
+-- > foreground:                                       [--] (rollback)
+-- > foreground:                                          [------ f a ------]
+-- > overall:    [--------------------specSTM g f a ------------------------]
 --
 -- Compare these to the timeline of @f $! a@:
 --
--- > [------- a -------]
--- >                   [------ f a ------]
+-- > foreground: [------- a -------]
+-- > foreground:                   [------ f a ------]
+--
 
 specSTM :: Eq a => STM a -> (a -> STM b) -> a -> STM b
 specSTM = specBySTM (returning (==))
@@ -177,8 +195,7 @@ specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (liftM2 (==))
 {-# INLINE specOnSTM' #-}
 
-
--- | Inspect the dynamic pointer tagging bits of a closure. This is an impure function that relies on GHC internals and may falsely return 0, but never give the wrong tag number if it returns a non-0 value.
+-- | Inspect the dynamic pointer tagging bits of a closure. This is an impure function that relies on GHC internals and may falsely return 0, but should never give the wrong tag number if it returns a non-0 value.
 unsafeGetTagBits :: a -> Int
 {-# INLINE unsafeGetTagBits #-}
 #ifndef TAGGED
@@ -193,4 +210,3 @@ data Box a = Box a
 unsafeIsEvaluated :: a -> Bool
 unsafeIsEvaluated a = unsafeGetTagBits a /= 0
 {-# INLINE unsafeIsEvaluated #-}
-

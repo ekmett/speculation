@@ -29,9 +29,15 @@ import Prelude hiding
 
 import Data.Monoid
 import qualified Data.List as List
-
 import Control.Concurrent.Speculation
 import Control.Concurrent.Speculation.Internal
+
+-- | Given a valid estimator @g@, @'scan' g xs@ converts @xs@ into a list of the prefix sums.
+-- 
+-- @g n@ should supply an estimate of the value of the monoidal summation over the first @n@ elements of the container.
+-- 
+-- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the prefix sum, then this can
+-- provide increased opportunities for parallelism.
 
 scan :: (Monoid m, Eq m) => (Int -> m) -> [m] -> [m]
 scan = scanBy (==)
@@ -42,12 +48,15 @@ scanBy :: Monoid m => (m -> m -> Bool) -> (Int -> m) -> [m] -> [m]
 scanBy cmp g = scanrBy cmp g mappend mempty
 {-# INLINE scanBy #-}
 
--- | Given a valid estimator @g@, @'scanMap' g f xs@ yields the same answer as @'scanMap' f xs@.
+-- | Given a valid estimator @g@, @'scanMap' g f xs@ converts @xs@ into a list of the prefix sums.
 -- 
--- @g n@ should supply an estimate of the value of the monoidal summation over the last @n@ elements of the container.
+-- @g n@ should supply an estimate of the value of the monoidal summation over the first @n@ elements of the container.
 -- 
 -- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the scan, then this can
 -- provide increased opportunities for parallelism.
+--
+-- > scan = scanMap id
+-- > scanMap = scanMapBy (==)
 
 scanMap :: (Monoid m, Eq m) => (Int -> m) -> (a -> m) -> [a] -> [m]
 scanMap = scanMapBy (==)
@@ -74,19 +83,51 @@ scanrBy cmp g f z = map extractAcc . List.scanr mf (Acc 0 z)
     mf a (Acc n b) = let n' = n + 1 in Acc n' (specBy' cmp (g n') (f a) b)
 {-# INLINE scanrBy #-}
 
+
+scanl  :: Eq b => (Int -> b) -> (b -> a -> b) -> b -> [a] -> [b]
+scanl = scanlBy (==) 
+{-# INLINE scanl #-}
+
+scanlBy  :: (b -> b -> Bool) -> (Int -> b) -> (b -> a -> b) -> b -> [a] -> [b]
+scanlBy cmp g f z = map extractAcc . List.scanl mf (Acc 0 z)
+  where
+    mf (Acc n a) b = let n' = n + 1 in Acc n' (specBy' cmp (g n') (`f` b) a)
+{-# INLINE scanlBy #-}
+
+scanr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> [a]
+scanr1 = scanr1By (==) 
+{-# INLINE scanr1 #-}
+
+scanr1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
+scanr1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanr mf NothingAcc xs
+  where
+    mf a (JustAcc n b) = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (f a) b)
+    mf a NothingAcc = JustAcc 1 a
+{-# INLINE scanr1By #-}
+
+scanl1 :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> [a]
+scanl1 = scanl1By (==)
+{-# INLINE scanl1 #-}
+
+scanl1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
+scanl1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanl mf NothingAcc xs
+  where
+    mf (JustAcc n a) b = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (`f` b) a)
+    mf NothingAcc b    = JustAcc 1 b
+{-# INLINE scanl1By #-}
+
 {-
-scanlM :: (Monad m, Eq (m b)) => (Int -> m b) -> (b -> a -> m b) -> m b -> [a] -> m [b]
+scanlM :: (Monad m, Eq b) => (Int -> b) -> (b -> a -> m b) -> b -> [a] -> m [b]
 scanlM = scanlByM (==)
 {-# INLINE scanlM #-}
 
-scanlByM ::  Monad m => (m b -> m b -> Bool) -> (Int -> m b) -> (b -> a -> m b) -> m b -> [a] -> m [b]
+scanlByM ::  Monad m => (b -> b -> Bool) -> (Int -> b) -> (b -> a -> m b) -> b -> [a] -> m [b]
 scanlByM  cmp g f mz = liftM (map extractAcc) . List.scanl go (liftM (map (Acc 0)) mz) 
   where
     go mia b = do
       Acc n a <- mia
-      let !n' = n + 1
-      a' <- specBy' cmp (g n') (>>= (`f` b)) (return a)
-      return (Acc n' a')
+      a' <- specBy' cmp (g n) (`f` b) a
+      return (Acc (n + 1) a')
 {-# INLINE scanlByM #-}
 
 scanrM :: (Monad m, Eq (m b)) => (Int -> m b) -> (a -> b -> m b) -> m b -> [a] -> m [b]
@@ -138,36 +179,3 @@ scanrBySTM cmp g f mz = liftM (map extractAcc) . List.scanr go (liftM (Acc 0) mz
 -- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the scan, then this can
 -- provide increased opportunities for parallelism.
 -}
-
-scanl  :: Eq b => (Int -> b) -> (b -> a -> b) -> b -> [a] -> [b]
-scanl = scanlBy (==) 
-{-# INLINE scanl #-}
-
-scanlBy  :: (b -> b -> Bool) -> (Int -> b) -> (b -> a -> b) -> b -> [a] -> [b]
-scanlBy cmp g f z = map extractAcc . List.scanl mf (Acc 0 z)
-  where
-    mf (Acc n a) b = let n' = n + 1 in Acc n' (specBy' cmp (g n') (`f` b) a)
-{-# INLINE scanlBy #-}
-
-scanr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> [a]
-scanr1 = scanr1By (==) 
-{-# INLINE scanr1 #-}
-
-scanr1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
-scanr1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanr mf NothingAcc xs
-  where
-    mf a (JustAcc n b) = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (f a) b)
-    mf a NothingAcc = JustAcc 1 a
-{-# INLINE scanr1By #-}
-
-scanl1 :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> [a]
-scanl1 = scanl1By (==)
-{-# INLINE scanl1 #-}
-
-scanl1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
-scanl1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanl mf NothingAcc xs
-  where
-    mf (JustAcc n a) b = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (`f` b) a)
-    mf NothingAcc b    = JustAcc 1 b
-{-# INLINE scanl1By #-}
-

@@ -29,7 +29,7 @@ instance Applicative (IntAccumL s) where
                 case ma i1 s1 of 
                     (# i2, s2, a #) -> (# i2, s2, f a #))
     
-mapAccumL :: (Traversable t, Eq a, Eq c) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumL :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL = mapAccumLBy (==)
 
 mapAccumLBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
@@ -57,7 +57,7 @@ instance Applicative (IntAccumR s) where
                 case mf i1 s1 of 
                     (# i2, s2, f #) -> (# i2, s2, f a #))
 
-mapAccumR :: (Traversable t, Eq a, Eq c) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
+mapAccumR :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumR = mapAccumRBy (==)
 
 mapAccumRBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)

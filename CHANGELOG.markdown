@@ -1,3 +1,6 @@
+/0.9.0/:
+ * Removed interim boxing in the unsafeIsEvaluated and unsafeGetTagBits check
+
 /0.8.1/:
  * Added Data.List.Foldable
  * Added Data.Traversable.Foldable

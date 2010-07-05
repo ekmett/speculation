@@ -26,11 +26,6 @@ which computes dequeElements(cap->spark) and to not speculate when that is too h
 Sadly, the cap and spark machinery is marked private by GHC, so this needs to become
 a ticket.
 
-unboxed tag-checking
---------------------
-
-For tag checking purposes, we should be able to unsafeCoerce# a :: Word#, but it isn't subkinded. Ticket?
-
 inconsistent use of the estimator function
 ------------------------------------------
 

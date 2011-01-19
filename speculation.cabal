@@ -1,5 +1,5 @@
 name:           speculation
-version:        1.2.0.0
+version:        1.2.0.1
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
@@ -106,11 +106,10 @@ library
     build-depends: base >= 4 && < 4.3
 
   build-depends:
-    ghc-prim >= 0.2 && < 0.3,
+    ghc-prim >= 0.2 && < 0.4,
     tag-bits >= 0.1 && < 0.2,
-    parallel >= 2.2 && < 2.3,
     transformers >= 0.2.2.0 && < 0.3,
-    stm >= 2.1 && < 2.2
+    stm >= 2.1 && < 2.3
 
   exposed-modules:
     Data.Speculation
@@ -137,12 +136,11 @@ executable test-speculation
     else
       build-depends: base >= 4 && < 4.3
     build-depends:
-      ghc-prim >= 0.2 && < 0.3,
+      ghc-prim >= 0.2 && < 0.4,
       tag-bits >= 0.1 && < 0.2,
-      parallel >= 2.2 && < 2.3,
-      stm >= 2.1 && < 2.2,
+      stm >= 2.1 && < 2.3,
       transformers >= 0.2.2.0 && < 0.3,
-      containers >= 0.3.0 && < 0.4,
+      containers >= 0.3.0 && < 0.5,
       test-framework >= 0.2.4 && < 0.3,
       test-framework-quickcheck >= 0.2.4 && < 0.3,
       test-framework-hunit >= 0.2.4 && < 0.3, 
@@ -171,12 +169,11 @@ executable benchmark-speculation
     else
       build-depends: base >= 4 && < 4.3
     build-depends:
-      ghc-prim >= 0.2 && < 0.3,
+      ghc-prim >= 0.2 && < 0.4,
       transformers >= 0.2.2.0 && < 0.3,
       tag-bits >= 0.1 && < 0.2,
-      parallel >= 2.2 && < 2.3,
-      stm >= 2.1 && < 2.2,
-      containers >= 0.3.0 && < 0.4,
+      stm >= 2.1 && < 2.3,
+      containers >= 0.3.0 && < 0.5,
       criterion >= 0.5 && < 0.6
     other-modules:
       Data.Speculation

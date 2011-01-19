@@ -1,3 +1,15 @@
+/1.2.0.1/
+ * Weakened dependencies
+
+/1.2.0.0/:
+ * Reorganized the module hierarchy into Data.Speculation.*
+
+/1.1.0.0/:
+ * Added support for numSparks
+
+/1.0.0.0/:
+ * Released
+
 /0.9.0/:
  * Removed interim boxing in the unsafeIsEvaluated and unsafeGetTagBits check
 

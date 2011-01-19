@@ -8,7 +8,7 @@ import Test.Framework.Providers.HUnit
 import Test.Framework.Providers.QuickCheck (testProperty)
 import Test.QuickCheck hiding ((==>))
 -- import Test.HUnit hiding (Test)
-import Control.Concurrent.Speculation
+import Data.Speculation
 
 main :: IO () 
 main = defaultMain tests

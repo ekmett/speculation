@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, BangPatterns, DeriveDataTypeable, MagicHash #-}
-module Control.Concurrent.Speculation
+module Data.Speculation
     (
     -- * Speculative application
       spec
@@ -18,15 +18,15 @@ module Control.Concurrent.Speculation
     ) where
 
 import Control.Concurrent.STM
-import Control.Concurrent.Speculation.Internal (returning)
+import Data.Speculation.Internal (returning)
 import Data.TagBits (unsafeIsEvaluated)
-import Control.Parallel (par)
 import Control.Monad (liftM2, unless)
 import Data.Function (on)
+import GHC.Conc
 
 -- * Basic speculation
 
--- | @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. Under high load, since 'f g' is computed via the spark queue, the speculation will be skipped and you will obtain the same answer as 'f $! a'.
+-- | @'spec' g f a@ evaluates @f g@ while forcing @a@, if @g == a@ then @f g@ is returned, otherwise @f a@ is evaluated and returned. Furthermore, if the argument has already been evaluated or are not running on the threaded runtime, we skip the @f g@ computation entirely. If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task. However, if the guess isn\'t available more cheaply than the actual answer, then this saves no work and if the guess is wrong, you risk evaluating the function twice. Under high load or in a runtime with access to a single capability, since 'f g' is computed via the spark queue, the speculation will be skipped and you will obtain the same answer as 'f $! a'.
 --
 --The best-case timeline looks like:
 --
@@ -84,13 +84,13 @@ specBy cmp guess f a
 
 -- | 'spec'' with a user defined comparison function
 specBy' :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
-specBy' cmp guess f a =
-    speculation `par`
-        if cmp guess a
-        then speculation
-        else f a
-    where
-        speculation = f guess
+specBy' cmp guess f a
+  | numCapabilities == 1 = f $! a
+  | otherwise = speculation `par` 
+    if cmp guess a
+    then speculation
+    else f a
+  where speculation = f guess
 {-# INLINE specBy' #-}
 
 -- | 'spec' comparing by projection onto another type
@@ -105,9 +105,9 @@ specOn' = specBy' . on (==)
 
 -- * STM-based speculation
 
--- | @'specSTM' g f a@ evaluates @fg = do g' <- g; f g'@, while forcing @a@, then if @g' == a@ then @fg@ is returned. Otherwise the side-effects of @fg@ are rolled back and @f a@ is evaluated. @g@ is allowed to be a monadic action, so that we can kickstart the computation of @a@ earlier.
+-- | @'specSTM' g f a@ evaluates @fg = do g' <- g; f g'@, while forcing @a@, then if @g' == a@ then @fg@ is returned. Otherwise the side-effects of @fg@ are rolled back and @f a@ is evaluated. @g@ is allowed to be a monadic action, so that we can kickstart the computation of @a@ earlier. Under high load, or when we are not using the parallel runtime, the speculation is avoided, to enable this to more closely approximate the runtime profile of spec.
 --
--- If the argument @a@ is already evaluated, we don\'t bother to perform @fg@ at all.
+-- If the argument @a@ is already evaluated, we don\'t bother to perform @f g@ at all.
 --
 -- If a good guess at the value of @a@ is available, this is one way to induce parallelism in an otherwise sequential task.
 --
@@ -162,17 +162,26 @@ specBySTM cmp guess f a
     | otherwise   = specBySTM' cmp guess f a
 {-# INLINE specBySTM #-}
 
+#ifndef HAS_NUM_SPARKS
+numSparks :: IO Int
+numSparks = return 0
+#endif
+
 -- | 'specSTM'' using a user defined comparison function
 specBySTM' :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM' cmp mguess f a = a `par` do
-    guess <- mguess
-    result <- f guess
-    -- rendezvous with a
-    matching <- cmp guess a
-    unless matching retry
-    return result
-  `orElse`
-    f a
+specBySTM' cmp mguess f a = do
+  sparks <- unsafeIOToSTM numSparks
+  if sparks < numCapabilities 
+    then a `par` do
+      guess <- mguess
+      result <- f guess
+      -- rendezvous with a
+      matching <- cmp guess a
+      unless matching retry
+      return result
+     `orElse`
+      f a
+    else f $! a 
 {-# INLINE specBySTM' #-}
 
 -- | @'specBySTM' . 'on' (==)@

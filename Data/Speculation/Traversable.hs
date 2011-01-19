@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples, BangPatterns #-}
-module Data.Traversable.Speculation
+module Data.Speculation.Traversable
     (
     -- * Traversable
     -- ** Applicative Traversals
@@ -26,8 +26,8 @@ import Data.Traversable (Traversable)
 import qualified Data.Traversable as Traversable
 import Control.Applicative
 import Control.Concurrent.STM
-import Control.Concurrent.Speculation
-import Control.Concurrent.Speculation.Internal
+import Data.Speculation
+import Data.Speculation.Internal
 
 mapAccumL :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL = mapAccumLBy (==)

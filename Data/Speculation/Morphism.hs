@@ -1,12 +1,12 @@
 {-# LANGUAGE BangPatterns, MagicHash #-}
-module Control.Morphism.Speculation
+module Data.Speculation.Morphism
     ( hylo
     ) where
 
 import GHC.Prim
 import GHC.Types
 
-import Control.Concurrent.Speculation
+import Data.Speculation
 
 {-
 newtype Mu f = In { out :: f (Mu f) } 

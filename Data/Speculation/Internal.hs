@@ -1,4 +1,4 @@
-module Control.Concurrent.Speculation.Internal 
+module Data.Speculation.Internal 
     ( Acc(..)
     , extractAcc
     , MaybeAcc(..)

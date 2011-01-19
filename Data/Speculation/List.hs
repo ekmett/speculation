@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Data.List.Speculation 
+module Data.Speculation.List
     ( 
     -- * Speculative scans
       scan, scanBy
@@ -29,8 +29,8 @@ import Prelude hiding
 
 import Data.Monoid
 import qualified Data.List as List
-import Control.Concurrent.Speculation
-import Control.Concurrent.Speculation.Internal
+import Data.Speculation
+import Data.Speculation.Internal
 
 -- | Given a valid estimator @g@, @'scan' g xs@ converts @xs@ into a list of the prefix sums.
 -- 

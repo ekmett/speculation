@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Data.Foldable.Speculation
+module Data.Speculation.Foldable
     ( 
     -- * Speculative folds
       fold, foldBy
@@ -55,8 +55,8 @@ import Data.Function (on)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as Foldable
 import Control.Concurrent.STM
-import Control.Concurrent.Speculation
-import Control.Concurrent.Speculation.Internal
+import Data.Speculation
+import Data.Speculation.Internal
 import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 

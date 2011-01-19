@@ -30,7 +30,7 @@ main :: IO ()
 main = defaultMainWithHooks hooks
 
 hooks :: UserHooks
-hooks = simpleUserHooks { runTests = testHook } 
+hooks = simpleUserHooks { runTests = runMyTests } 
 
 findHPC :: LocalBuildInfo -> IO FilePath
 findHPC lbi = do
@@ -48,8 +48,8 @@ testSpeculation dflt f pd =
                | exe <- executables pd
                , exeName exe == "test-speculation" ]
 
-testHook :: Args -> Bool -> PackageDescription -> LocalBuildInfo -> IO ()
-testHook args0 _unknown pd lbi = do
+runMyTests :: Args -> Bool -> PackageDescription -> LocalBuildInfo -> IO ()
+runMyTests args0 _unknown pd lbi = do
     let args = if null args0 then [] else "-t" : args0
     -- dir <- getWorkingDirectory
     let testDir = buildDir lbi </> "test-speculation"

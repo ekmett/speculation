@@ -1,3 +1,6 @@
+/1.2.0.2/
+ * Fixed name collision with the new Distribution.Simple.testHook in Setup.lhs
+
 /1.2.0.1/
  * Weakened dependencies
 

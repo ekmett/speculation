@@ -1,5 +1,16 @@
 {-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples, BangPatterns #-}
-module Data.Speculation.Traversable
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Concurrent.Speculation.Traversable
+-- Copyright   :  (C) 2010-2011 Edward Kmett,
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Stability   :  provisional
+-- Portability :  non-portable (UnboxedTuples, Rank2Types)
+--
+----------------------------------------------------------------------------
+module Control.Concurrent.Speculation.Traversable
     (
     -- * Traversable
     -- ** Applicative Traversals
@@ -13,7 +24,6 @@ module Data.Speculation.Traversable
     -- ** STM-based traversals with transactional rollback
     , mapSTM, mapBySTM
     , forSTM, forBySTM
---    , sequenceSTM, sequenceBySTM
     -- * Accumulating parameters
     , mapAccumL, mapAccumLBy
     , mapAccumR, mapAccumRBy
@@ -26,8 +36,8 @@ import Data.Traversable (Traversable)
 import qualified Data.Traversable as Traversable
 import Control.Applicative
 import Control.Concurrent.STM
-import Data.Speculation
-import Data.Speculation.Internal
+import Control.Concurrent.Speculation
+import Control.Concurrent.Speculation.Internal
 
 mapAccumL :: (Traversable t, Eq a) => (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL = mapAccumLBy (==)
@@ -36,7 +46,7 @@ mapAccumL = mapAccumLBy (==)
 mapAccumLBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumLBy cmp g f z xs = runIntAccumL (Traversable.traverse go xs) 0 z
   where
-    go b = IntAccumL (\n a -> 
+    go b = IntAccumL (\n a ->
             let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumLBy #-}
@@ -48,7 +58,7 @@ mapAccumR = mapAccumRBy (==)
 mapAccumRBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumRBy cmp g f z xs = runIntAccumR (Traversable.traverse go xs) 0 z
   where
-    go b = IntAccumR (\n a -> 
+    go b = IntAccumR (\n a ->
             let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumRBy #-}
@@ -82,7 +92,7 @@ mapBySTM cmp g f xs = unwrapMonad (runAccT (Traversable.traverse go xs) 0)
     go a = AccT $ \i -> acc (i +# 1#) $ WrapMonad $ specBySTM cmp (g (I# i)) f a
 {-# INLINE mapBySTM #-}
 
-      
+
 sequenceA :: (Traversable t, Applicative f, Eq (f a)) => (Int -> f a) -> t (f a) -> f (t a)
 sequenceA g = traverse g id
 {-# INLINE sequenceA #-}
@@ -153,9 +163,9 @@ instance Functor (IntAccumL s) where
 instance Applicative (IntAccumL s) where
     pure a = IntAccumL (\i s -> (# i, s, a #))
     IntAccumL mf <*> IntAccumL ma = IntAccumL (\i s ->
-        case mf i s of 
+        case mf i s of
             (# i1, s1, f #) ->
-                case ma i1 s1 of 
+                case ma i1 s1 of
                     (# i2, s2, a #) -> (# i2, s2, f a #))
 
 data IntAccumR s a = IntAccumR (Int# -> s -> (# Int#, s, a #))
@@ -172,9 +182,9 @@ instance Functor (IntAccumR s) where
 instance Applicative (IntAccumR s) where
     pure a = IntAccumR (\i s -> (# i, s, a #))
     IntAccumR mf <*> IntAccumR ma = IntAccumR (\i s ->
-        case ma i s of 
+        case ma i s of
             (# i1, s1, a #) ->
-                case mf i1 s1 of 
+                case mf i1 s1 of
                     (# i2, s2, f #) -> (# i2, s2, f a #))
 
 -- applicative composition with a strict integer state applicative
@@ -189,7 +199,7 @@ instance Functor f => Functor (AccT f) where
 
 instance Applicative f => Applicative (AccT f) where
     pure a = AccT (\i -> Acc (I# i) (pure a))
-    AccT mf <*> AccT ma = AccT (\i0# -> 
+    AccT mf <*> AccT ma = AccT (\i0# ->
         let !(Acc !(I# i1#) f) = mf i0#
             !(Acc i2 a) = ma i1#
         in  Acc i2 (f <*> a))

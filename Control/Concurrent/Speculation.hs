@@ -1,5 +1,16 @@
-{-# LANGUAGE CPP, BangPatterns, DeriveDataTypeable, MagicHash #-}
-module Data.Speculation
+{-# LANGUAGE CPP #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Concurrent.Speculation
+-- Copyright   :  (C) 2008-2011 Edward Kmett,
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Stability   :  provisional
+-- Portability :  portable
+--
+----------------------------------------------------------------------------
+module Control.Concurrent.Speculation
     (
     -- * Speculative application
       spec
@@ -18,7 +29,7 @@ module Data.Speculation
     ) where
 
 import Control.Concurrent.STM
-import Data.Speculation.Internal (returning)
+import Control.Concurrent.Speculation.Internal (returning)
 import Data.TagBits (unsafeIsEvaluated)
 import Control.Monad (liftM2, unless)
 import Data.Function (on)
@@ -86,7 +97,7 @@ specBy cmp guess f a
 specBy' :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
 specBy' cmp guess f a
   | numCapabilities == 1 = f $! a
-  | otherwise = speculation `par` 
+  | otherwise = speculation `par`
     if cmp guess a
     then speculation
     else f a
@@ -162,16 +173,11 @@ specBySTM cmp guess f a
     | otherwise   = specBySTM' cmp guess f a
 {-# INLINE specBySTM #-}
 
-#ifndef HAS_NUM_SPARKS
-numSparks :: IO Int
-numSparks = return 0
-#endif
-
 -- | 'specSTM'' using a user defined comparison function
 specBySTM' :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
 specBySTM' cmp mguess f a = do
   sparks <- unsafeIOToSTM numSparks
-  if sparks < numCapabilities 
+  if sparks < numCapabilities
     then a `par` do
       guess <- mguess
       result <- f guess
@@ -181,7 +187,7 @@ specBySTM' cmp mguess f a = do
       return result
      `orElse`
       f a
-    else f $! a 
+    else f $! a
 {-# INLINE specBySTM' #-}
 
 -- | @'specBySTM' . 'on' (==)@

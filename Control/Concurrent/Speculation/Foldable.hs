@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
-module Data.Speculation.Foldable
+module Control.Concurrent.Speculation.Foldable
     ( 
     -- * Speculative folds
       fold, foldBy
@@ -55,8 +55,8 @@ import Data.Function (on)
 import Data.Foldable (Foldable)
 import qualified Data.Foldable as Foldable
 import Control.Concurrent.STM
-import Data.Speculation
-import Data.Speculation.Internal
+import Control.Concurrent.Speculation
+import Control.Concurrent.Speculation.Internal
 import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
@@ -349,7 +349,7 @@ any :: Foldable t => (Int -> Bool) -> (a -> Bool) -> t a -> Bool
 any g p = getAny . foldMap (Any . g) (Any . p)
 {-# INLINE any #-}
 
-sum :: (Foldable t, Num a) => (Int -> a) -> t a -> a
+sum :: (Foldable t, Eq a, Num a) => (Int -> a) -> t a -> a
 sum = sumBy (==)
 {-# INLINE sum #-}
 
@@ -357,7 +357,7 @@ sumBy :: (Foldable t, Num a) => (a -> a -> Bool) -> (Int -> a) -> t a -> a
 sumBy cmp g = getSum . foldMapBy (on cmp getSum) (Sum . g) Sum
 {-# INLINE sumBy #-}
 
-product :: (Foldable t, Num a) => (Int -> a) -> t a -> a
+product :: (Foldable t, Eq a, Num a) => (Int -> a) -> t a -> a
 product = productBy (==)
 {-# INLINE product #-}
 

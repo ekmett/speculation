@@ -29,7 +29,7 @@ If `g` is a good guess at the value of `a`, this is one way to induce parallelis
 
 However, if `g` isn\'t available more cheaply than `a`, then this saves no work, and if `g` is wrong, you risk evaluating the function twice.
     spec a f a = f $! a
-    
+
 The best-case timeline looks like:
     [---- f g ----]
        [----- a -----]
@@ -40,7 +40,7 @@ The worst-case timeline looks like:
        [----- a -----]
                      [---- f a ----]
     [------- spec g f a -----------]
-    
+
 Compare these to the timeline of `f $! a`:
     [---- a -----]
                  [---- f a ----]
@@ -53,7 +53,7 @@ Speculative Folds (Data.Foldable.Speculation)
 ---------------------------------------------
 
 A speculative version of the combinators from `Data.Foldable` is provided as `Data.Foldable.Speculation`.
-    
+
 Each combinator therein takes an extra argument that is used to speculate on the value of the list.
 
 #### foldr

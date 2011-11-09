@@ -1,4 +1,15 @@
-module Data.Speculation.Internal 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Concurrent.Speculation.Internal
+-- Copyright   :  (C) 2010-2011 Edward Kmett
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Stability   :  provisional
+-- Portability :  portable
+--
+----------------------------------------------------------------------------
+module Control.Concurrent.Speculation.Internal
     ( Acc(..)
     , extractAcc
     , MaybeAcc(..)

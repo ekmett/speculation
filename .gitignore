@@ -1,2 +1,4 @@
 dist
 .hpc
+*.swo
+*.swp

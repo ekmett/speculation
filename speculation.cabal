@@ -89,7 +89,7 @@ library
     ghc-prim >= 0.2 && < 0.4,
     tag-bits >= 0.1 && < 0.2,
     transformers >= 0.2.2.0 && < 0.3,
-    stm >= 2.1 && < 2.3
+    stm >= 2.1 && < 2.4
 
   exposed-modules:
     Control.Concurrent.Speculation

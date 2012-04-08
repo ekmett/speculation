@@ -199,3 +199,5 @@ specOnSTM = specBySTM . on (liftM2 (==))
 specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM' = specBySTM' . on (liftM2 (==))
 {-# INLINE specOnSTM' #-}
+
+

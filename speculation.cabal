@@ -1,11 +1,12 @@
 name:           speculation
-version:        1.4.1
+version:        1.4.1.1
 license:        BSD3
 license-file:   LICENSE
 author:         Edward A. Kmett
 maintainer:     Edward A. Kmett <ekmett@gmail.com>
 stability:      experimental
 homepage:       http://github.com/ekmett/speculation
+bug-reports:    http://github.com/ekmett/speculation/issues
 category:       Concurrency
 copyright:      (c) 2010 Edward A. Kmett
 build-type:     Custom
@@ -64,10 +65,7 @@ description:
  .
  'specSTM' provides a similar time table for STM actions, but also rolls back side-effects. The one unfortunate operational distinction is that it is forced to compute 'a' in the background thread and therefore degrades slightly less gracefully under load, although we mitigate this effect by only enqueuing if the number of sparks for the current capability is lower than the total number of capabilities, to try to avoid wasting time when all computational resources are in use.
 
-extra-source-files:
-  README.markdown
-  CHANGELOG.markdown
-  ISSUES.markdown
+extra-source-files: README.markdown CHANGELOG.markdown ISSUES.markdown .travis.yml
 
 source-repository head
   type:     git

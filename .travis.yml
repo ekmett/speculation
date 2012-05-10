@@ -2,3 +2,4 @@ language: haskell
 install:
   - cabal update
   - cabal install
+test:

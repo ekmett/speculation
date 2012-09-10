@@ -49,7 +49,7 @@ description:
  > foreground:                 [---- f a ----]
  > spark:         [---- f g ----######         (#'s mark when this spark is collectable)
  > overall:    [--------- spec g f a --------]
- . 
+ .
  Under high load:
  .
  > foreground: [----- a -----]
@@ -87,7 +87,7 @@ library
     ghc-prim,
     tag-bits     >= 0.1 && < 0.2,
     transformers >= 0.2.2.0 && < 0.4,
-    stm          >= 2.1 && < 2.4
+    stm          >= 2.1 && < 2.5
 
   exposed-modules:
     Control.Concurrent.Speculation

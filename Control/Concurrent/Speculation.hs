@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.Speculation
@@ -14,23 +17,16 @@ module Control.Concurrent.Speculation
     (
     -- * Speculative application
       spec
-    , spec'
     , specBy
-    , specBy'
     , specOn
-    , specOn'
     -- * Speculative application with transactional rollback
     , specSTM
-    , specSTM'
     , specOnSTM
-    , specOnSTM'
     , specBySTM
-    , specBySTM'
     ) where
 
 import Control.Concurrent.STM
 import Control.Concurrent.Speculation.Internal (returning)
-import Data.TagBits (unsafeIsEvaluated)
 import Control.Monad (liftM2, unless)
 import Data.Function (on)
 import GHC.Conc
@@ -79,40 +75,21 @@ spec :: Eq a => a -> (a -> b) -> a -> b
 spec = specBy (==)
 {-# INLINE spec #-}
 
--- | Unlike 'spec', this version does not check to see if the argument has already been evaluated. This can save
--- a small amount of work when you know the argument will always require computation.
-
-spec' :: Eq a => a -> (a -> b) -> a -> b
-spec' = specBy' (==)
-{-# INLINE spec' #-}
-
 -- | 'spec' with a user defined comparison function
 specBy :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
 specBy cmp guess f a
-    | unsafeIsEvaluated a = f a
-    | otherwise = specBy' cmp guess f a
-{-# INLINE specBy #-}
-
--- | 'spec'' with a user defined comparison function
-specBy' :: (a -> a -> Bool) -> a -> (a -> b) -> a -> b
-specBy' cmp guess f a
   | numCapabilities == 1 = f $! a
   | otherwise = speculation `par`
     if cmp guess a
     then speculation
     else f a
   where speculation = f guess
-{-# INLINE specBy' #-}
+{-# INLINE specBy #-}
 
 -- | 'spec' comparing by projection onto another type
 specOn :: Eq c => (a -> c) -> a -> (a -> b) -> a -> b
 specOn = specBy . on (==)
 {-# INLINE specOn #-}
-
--- | 'spec'' comparing by projection onto another type
-specOn' :: Eq c => (a -> c) -> a -> (a -> b) -> a -> b
-specOn' = specBy' . on (==)
-{-# INLINE specOn' #-}
 
 -- * STM-based speculation
 
@@ -160,22 +137,9 @@ specSTM :: Eq a => STM a -> (a -> STM b) -> a -> STM b
 specSTM = specBySTM (returning (==))
 {-# INLINE specSTM #-}
 
--- | Unlike 'specSTM', 'specSTM'' doesn't check if the argument has already been evaluated.
-
-specSTM' :: Eq a => STM a -> (a -> STM b) -> a -> STM b
-specSTM' = specBySTM' (returning (==))
-{-# INLINE specSTM' #-}
-
 -- | 'specSTM' using a user defined comparison function
 specBySTM :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM cmp guess f a
-    | unsafeIsEvaluated a = f a
-    | otherwise   = specBySTM' cmp guess f a
-{-# INLINE specBySTM #-}
-
--- | 'specSTM'' using a user defined comparison function
-specBySTM' :: (a -> a -> STM Bool) -> STM a -> (a -> STM b) -> a -> STM b
-specBySTM' cmp mguess f a = do
+specBySTM cmp mguess f a = do
   sparks <- unsafeIOToSTM numSparks
   if sparks < numCapabilities
     then a `par` do
@@ -188,16 +152,9 @@ specBySTM' cmp mguess f a = do
      `orElse`
       f a
     else f $! a
-{-# INLINE specBySTM' #-}
+{-# INLINE specBySTM #-}
 
 -- | @'specBySTM' . 'on' (==)@
 specOnSTM :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
 specOnSTM = specBySTM . on (liftM2 (==))
 {-# INLINE specOnSTM #-}
-
--- | @'specBySTM'' . 'on' (==)@
-specOnSTM' :: Eq c => (a -> STM c) -> STM a -> (a -> STM b) -> a -> STM b
-specOnSTM' = specBySTM' . on (liftM2 (==))
-{-# INLINE specOnSTM' #-}
-
-

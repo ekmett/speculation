@@ -23,9 +23,6 @@ class MonadSpec m where
   -- | @spec@ with a user supplied comparison function
   specByM :: (a -> a -> Bool) -> a -> a -> m a
 
-  -- | @spec'@ with a user supplied comparison function
-  specByM' :: (a -> a -> Bool) -> a -> a -> m a
-
 -- | When a is unevaluated, @'spec' g a@ evaluates the current continuation 
 -- with @g@ while testing if @g@ '==' @a@, if they differ, it re-evalutes the
 -- continuation with @a@. If @a@ was already evaluated, the continuation is
@@ -33,21 +30,11 @@ class MonadSpec m where
 specM :: (MonadSpec m, Eq a) => a -> a -> m a
 specM = specByM (==)
 
--- | As per 'spec', without the check for whether or not the second argument
--- is already evaluated.
-specM' :: (MonadSpec m, Eq a) => a -> a -> m a
-specM' = specByM' (==)
-
 -- | @spec'@ with a user supplied comparison function
 specOnM :: (MonadSpec m, Eq c) => (a -> c) -> a -> a -> m a
 specOnM = specByM . on (==)
-
--- | @spec'@ with a user supplied comparison function
-specOnM' :: (MonadSpec m, Eq c) => (a -> c) -> a -> a -> m a
-specOnM' = specByM . on (==)
 
 -- * Basic speculation
 
 instance Monad m => MonadSpec (ContT r m) where
   specByM f g a = ContT $ \k -> specBy f g k a
-  specByM' f g a = ContT $ \k -> specBy' f g k a

@@ -105,8 +105,8 @@ foldr = foldrBy (==)
 -- provide increased opportunities for parallelism.
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
-  where 
-    mf a (Acc n b) = Acc (n + 1) (specBy' cmp (g n) (f a) b)
+  where
+    mf a (Acc n b) = Acc (n + 1) (specBy cmp (g n) (f a) b)
 {-# INLINE foldrBy #-}
 
 
@@ -119,14 +119,14 @@ foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z xs = Foldable.foldr mf (Acc 0 (const z)) xs 0
   where 
-    mf a (Acc r b) !l = let l' = l + 1 in Acc (r + 1) (specBy' cmp (g l') (f a) (b l'))
+    mf a (Acc r b) !l = let l' = l + 1 in Acc (r + 1) (specBy cmp (g l') (f a) (b l'))
 {-# INLINE foldrBy #-}
 
 -- this estimator receives the number of values to the left of the summation. 
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z xs = Foldable.foldr mf (const z) xs 0
   where 
-    mf a b !i = let i' = i + 1 in specBy' cmp (g i') (f a) (b i')
+    mf a b !i = let i' = i + 1 in specBy cmp (g i') (f a) (b i')
 {-# INLINE foldrBy #-}
 -}
 
@@ -139,7 +139,7 @@ foldlByM  cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
   where
     go mia b = do
       Acc n a <- mia
-      a' <- specBy' cmp (g n) (>>= (`f` b)) (return a)
+      a' <- specBy cmp (g n) (>>= (`f` b)) (return a)
       return (Acc (n + 1) a')
 {-# INLINE foldlByM #-}
 
@@ -152,7 +152,7 @@ foldrByM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
   where
     go a mib = do
       Acc n b <- mib
-      b' <- specBy' cmp (g n) (>>= f a) (return b)
+      b' <- specBy cmp (g n) (>>= f a) (return b)
       return (Acc (n + 1) b')
 {-# INLINE foldrByM #-}
 
@@ -165,7 +165,7 @@ foldlBySTM cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
   where
     go mia b = do
       Acc n a <- mia
-      a' <- specBySTM' cmp (g n) (`f` b) a
+      a' <- specBySTM cmp (g n) (`f` b) a
       return (Acc (n + 1) a')
 {-# INLINE foldlBySTM #-}
 
@@ -178,7 +178,7 @@ foldrBySTM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
   where
     go a mib = do
       Acc n b <- mib
-      b' <- specBySTM' cmp (g n) (f a) b
+      b' <- specBySTM cmp (g n) (f a) b
       return (Acc (n + 1) b')
 {-# INLINE foldrBySTM #-}
 
@@ -196,7 +196,7 @@ foldl = foldlBy (==)
 foldlBy  :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
 foldlBy cmp g f z = extractAcc . Foldable.foldl mf (Acc 0 z)
   where
-    mf (Acc n a) b = Acc (n + 1) (specBy' cmp (g n) (`f` b) a)
+    mf (Acc n a) b = Acc (n + 1) (specBy cmp (g n) (`f` b) a)
 {-# INLINE foldlBy #-}
 
 foldr1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
@@ -207,7 +207,7 @@ foldr1By :: Foldable f => (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> f a
 foldr1By cmp g f xs = fromMaybeAcc (errorEmptyStructure "foldr1")
                                    (Foldable.foldr mf NothingAcc xs)
   where
-    mf a (JustAcc n b) = JustAcc (n + 1) (specBy' cmp (g n) (f a) b)
+    mf a (JustAcc n b) = JustAcc (n + 1) (specBy cmp (g n) (f a) b)
     mf a NothingAcc = JustAcc 1 a
 {-# INLINE foldr1By #-}
 
@@ -219,7 +219,7 @@ foldl1By :: Foldable f => (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> f a
 foldl1By cmp g f xs = fromMaybeAcc (errorEmptyStructure "foldl1")
                                (Foldable.foldl mf NothingAcc xs)
   where
-    mf (JustAcc n a) b = JustAcc (n + 1) (specBy' cmp (g n) (`f` b) a)
+    mf (JustAcc n a) b = JustAcc (n + 1) (specBy cmp (g n) (`f` b) a)
     mf NothingAcc b    = JustAcc 1 b
 {-# INLINE foldl1By #-}
 

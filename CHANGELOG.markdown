@@ -1,3 +1,7 @@
+/1.5/
+
+ * Removed the use of `tag-bits`. This enables the API to be `Trustworthy`.
+
 /1.4/
 
  * Simplified MonadSpec

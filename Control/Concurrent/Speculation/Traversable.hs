@@ -1,4 +1,8 @@
 {-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples, BangPatterns #-}
+{-# LANGUAGE CPP #-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.Speculation.Traversable
@@ -47,7 +51,7 @@ mapAccumLBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a,
 mapAccumLBy cmp g f z xs = runIntAccumL (Traversable.traverse go xs) 0 z
   where
     go b = IntAccumL (\n a ->
-            let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
+            let ~(a', c) = specBy cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumLBy #-}
 
@@ -59,7 +63,7 @@ mapAccumRBy :: Traversable t => (a -> a -> Bool) -> (Int -> a) -> (a -> b -> (a,
 mapAccumRBy cmp g f z xs = runIntAccumR (Traversable.traverse go xs) 0 z
   where
     go b = IntAccumR (\n a ->
-            let ~(a', c) = specBy' cmp (g (I# n)) (`f` b) a
+            let ~(a', c) = specBy cmp (g (I# n)) (`f` b) a
             in (# n +# 1#, a', c #))
 {-# INLINE mapAccumRBy #-}
 

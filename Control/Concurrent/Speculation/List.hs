@@ -90,7 +90,7 @@ scanr = scanrBy (==)
 scanrBy :: (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> [a] -> [b]
 scanrBy cmp g f z = map extractAcc . List.scanr mf (Acc 0 z)
   where
-    mf a (Acc n b) = let n' = n + 1 in Acc n' (specBy' cmp (g n') (f a) b)
+    mf a (Acc n b) = let n' = n + 1 in Acc n' (specBy cmp (g n') (f a) b)
 {-# INLINE scanrBy #-}
 
 
@@ -101,7 +101,7 @@ scanl = scanlBy (==)
 scanlBy  :: (b -> b -> Bool) -> (Int -> b) -> (b -> a -> b) -> b -> [a] -> [b]
 scanlBy cmp g f z = map extractAcc . List.scanl mf (Acc 0 z)
   where
-    mf (Acc n a) b = let n' = n + 1 in Acc n' (specBy' cmp (g n') (`f` b) a)
+    mf (Acc n a) b = let n' = n + 1 in Acc n' (specBy cmp (g n') (`f` b) a)
 {-# INLINE scanlBy #-}
 
 scanr1 :: Eq a => (Int -> a) -> (a -> a -> a) -> [a] -> [a]
@@ -111,7 +111,7 @@ scanr1 = scanr1By (==)
 scanr1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
 scanr1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanr mf NothingAcc xs
   where
-    mf a (JustAcc n b) = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (f a) b)
+    mf a (JustAcc n b) = let n' = n + 1 in JustAcc n' (specBy cmp (g n') (f a) b)
     mf a NothingAcc = JustAcc 1 a
 {-# INLINE scanr1By #-}
 
@@ -122,6 +122,6 @@ scanl1 = scanl1By (==)
 scanl1By :: (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> [a] -> [a]
 scanl1By cmp g f xs = map (fromMaybeAcc undefined) $ List.scanl mf NothingAcc xs
   where
-    mf (JustAcc n a) b = let n' = n + 1 in JustAcc n' (specBy' cmp (g n') (`f` b) a)
+    mf (JustAcc n a) b = let n' = n + 1 in JustAcc n' (specBy cmp (g n') (`f` b) a)
     mf NothingAcc b    = JustAcc 1 b
 {-# INLINE scanl1By #-}

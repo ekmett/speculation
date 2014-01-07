@@ -5,10 +5,10 @@ import Prelude hiding ((||),(&&))
 import Test.Framework (Test)
 import Test.Framework (defaultMain, testGroup)
 import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck (testProperty)
+import Test.Framework.Providers.QuickCheck2 (testProperty)
 import Test.QuickCheck hiding ((==>))
 -- import Test.HUnit hiding (Test)
-import Data.Speculation
+import Control.Concurrent.Speculation
 
 main :: IO () 
 main = defaultMain tests

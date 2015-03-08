@@ -1,3 +1,7 @@
+/1.5.0.2/
+
+ * Build warning-free on GHC 7.10+
+
 /1.5/
 
  * Removed the use of `tag-bits`. This enables the API to be `Trustworthy`.

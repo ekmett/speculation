@@ -3,6 +3,7 @@
  * Build warning-free on GHC 7.10+
  * Added an HLint configuration
  * Removed a redundant constraint from the type of `sequenceByA_`.
+ * Removed a redundant `Monad m` constraint from `instance MonadSpec (ContT r m)`.
 
 /1.5/
 

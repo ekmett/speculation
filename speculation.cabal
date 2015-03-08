@@ -85,7 +85,7 @@ library
 
   build-depends:
     ghc-prim,
-    transformers >= 0.2.2.0 && < 0.4,
+    transformers >= 0.2.2.0 && < 0.5,
     stm          >= 2.1 && < 2.5
 
   exposed-modules:

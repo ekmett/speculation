@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.Speculation.Internal
@@ -18,9 +19,11 @@ module Control.Concurrent.Speculation.Internal
     , returning
     ) where
 
-import Data.Foldable
-import Data.Traversable
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+import Data.Foldable
+#endif
+import Data.Traversable
 
 -- comonad!
 data Acc a = Acc {-# UNPACK #-} !Int a

@@ -33,10 +33,19 @@ module Control.Concurrent.Speculation.Traversable
     , mapAccumR, mapAccumRBy
     ) where
 
-import Prelude hiding (mapM, sequence)
+import Prelude hiding
+  ( mapM
+  , sequence
+#if __GLASGOW_HASKELL__ >= 710
+  , traverse
+  , sequenceA
+#endif
+  )
 import GHC.Prim
 import GHC.Types
+#if __GLASGOW_HASKELL__ < 710
 import Data.Traversable (Traversable)
+#endif
 import qualified Data.Traversable as Traversable
 import Control.Applicative
 import Control.Concurrent.STM

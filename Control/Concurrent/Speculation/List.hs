@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.Speculation.List
@@ -37,7 +38,9 @@ import Prelude hiding
     , scanr, scanl, scanr1, scanl1
     )
 
+#if __GLASGOW_HASKELL__ < 710
 import Data.Monoid
+#endif
 import qualified Data.List as List
 import Control.Concurrent.Speculation
 import Control.Concurrent.Speculation.Internal

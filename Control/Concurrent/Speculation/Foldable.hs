@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 module Control.Concurrent.Speculation.Foldable
     ( 
@@ -43,16 +44,22 @@ module Control.Concurrent.Speculation.Foldable
     ) where
 
 import Prelude hiding 
-    (foldl, foldl1, foldr, foldr1
+    ( foldl, foldl1, foldr, foldr1
     , any, all, and, or, mapM_, sequence_
     , elem, notElem, sum, product
     , minimum, maximum, concat, concatMap
+#if __GLASGOW_HASKELL__ >= 710
+    , foldMap
+#endif
     )
 
 import Data.Monoid
 import Data.Ix ()
 import Data.Function (on)
+
+#if __GLASGOW_HASKELL__ < 710
 import Data.Foldable (Foldable)
+#endif
 import qualified Data.Foldable as Foldable
 import Control.Concurrent.STM
 import Control.Concurrent.Speculation
@@ -91,7 +98,6 @@ foldMap = foldMapBy (==)
 foldMapBy :: (Foldable f, Monoid m) => (m -> m -> Bool) -> (Int -> m) -> (a -> m) -> f a -> m
 foldMapBy cmp g f = foldrBy cmp g (mappend . f) mempty
 {-# INLINE foldMapBy #-}
-
 
 foldr :: (Foldable f, Eq b) => (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldr = foldrBy (==)

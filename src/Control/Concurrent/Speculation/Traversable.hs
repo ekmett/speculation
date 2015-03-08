@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples, BangPatterns #-}
+{-# LANGUAGE MagicHash, Rank2Types, UnboxedTuples #-}
 {-# LANGUAGE CPP #-}
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Trustworthy #-}
@@ -213,6 +213,6 @@ instance Functor f => Functor (AccT f) where
 instance Applicative f => Applicative (AccT f) where
     pure a = AccT (\i -> Acc (I# i) (pure a))
     AccT mf <*> AccT ma = AccT (\i0# ->
-        let !(Acc !(I# i1#) f) = mf i0#
-            !(Acc i2 a) = ma i1#
+        let (Acc (I# i1#) f) = mf i0#
+            (Acc i2 a) = ma i1#
         in  Acc i2 (f <*> a))

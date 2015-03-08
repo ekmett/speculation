@@ -1,7 +1,18 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Concurrent.Speculation.Foldable
+-- Copyright   :  (C) 2010-2015 Edward Kmett
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Edward Kmett <ekmett@gmail.com>
+-- Stability   :  provisional
+-- Portability :  portable
+--
+----------------------------------------------------------------------------
 module Control.Concurrent.Speculation.Foldable
-    ( 
+    (
     -- * Speculative folds
       fold, foldBy
     , foldMap, foldMapBy
@@ -43,7 +54,7 @@ module Control.Concurrent.Speculation.Foldable
     , find, findBy
     ) where
 
-import Prelude hiding 
+import Prelude hiding
     ( foldl, foldl1, foldr, foldr1
     , any, all, and, or, mapM_, sequence_
     , elem, notElem, sum, product
@@ -68,9 +79,9 @@ import Control.Applicative
 import Control.Monad hiding (mapM_, msum, forM_, sequence_)
 
 -- | Given a valid estimator @g@, @'fold' g f xs@ yields the same answer as @'fold' f xs@.
--- 
+--
 -- @g n@ should supply an estimate of the value of the monoidal summation over the last @n@ elements of the container.
--- 
+--
 -- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
 -- provide increased opportunities for parallelism.
 
@@ -84,9 +95,9 @@ foldBy cmp g = foldrBy cmp g mappend mempty
 {-# INLINE foldBy #-}
 
 -- | Given a valid estimator @g@, @'foldMap' g f xs@ yields the same answer as @'foldMap' f xs@.
--- 
+--
 -- @g n@ should supply an estimate of the value of the monoidal summation over the last @n@ elements of the container.
--- 
+--
 -- If @g n@ is accurate a reasonable percentage of the time and faster to compute than the fold, then this can
 -- provide increased opportunities for parallelism.
 
@@ -124,14 +135,14 @@ foldrBy cmp g f z = extractAcc . Foldable.foldr mf (Acc 0 z)
 
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z xs = Foldable.foldr mf (Acc 0 (const z)) xs 0
-  where 
+  where
     mf a (Acc r b) !l = let l' = l + 1 in Acc (r + 1) (specBy cmp (g l') (f a) (b l'))
 {-# INLINE foldrBy #-}
 
--- this estimator receives the number of values to the left of the summation. 
+-- this estimator receives the number of values to the left of the summation.
 foldrBy :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (a -> b -> b) -> b -> f a -> b
 foldrBy cmp g f z xs = Foldable.foldr mf (const z) xs 0
-  where 
+  where
     mf a b !i = let i' = i + 1 in specBy cmp (g i') (f a) (b i')
 {-# INLINE foldrBy #-}
 -}
@@ -141,7 +152,7 @@ foldlM = foldlByM (==)
 {-# INLINE foldlM #-}
 
 foldlByM ::  (Foldable f, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> (b -> a -> m b) -> m b -> f a -> m b
-foldlByM  cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz) 
+foldlByM  cmp g f mz = liftM extractAcc . Foldable.foldl go (liftM (Acc 0) mz)
   where
     go mia b = do
       Acc n a <- mia
@@ -154,7 +165,7 @@ foldrM = foldrByM (==)
 {-# INLINE foldrM #-}
 
 foldrByM :: (Foldable f, Monad m) => (m b -> m b -> Bool) -> (Int -> m b) -> (a -> b -> m b) -> m b -> f a -> m b
-foldrByM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz) 
+foldrByM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
   where
     go a mib = do
       Acc n b <- mib
@@ -196,7 +207,7 @@ foldrBySTM cmp g f mz = liftM extractAcc . Foldable.foldr go (liftM (Acc 0) mz)
 -- provide increased opportunities for parallelism.
 
 foldl  :: (Foldable f, Eq b) => (Int -> b) -> (b -> a -> b) -> b -> f a -> b
-foldl = foldlBy (==) 
+foldl = foldlBy (==)
 {-# INLINE foldl #-}
 
 foldlBy  :: Foldable f => (b -> b -> Bool) -> (Int -> b) -> (b -> a -> b) -> b -> f a -> b
@@ -206,7 +217,7 @@ foldlBy cmp g f z = extractAcc . Foldable.foldl mf (Acc 0 z)
 {-# INLINE foldlBy #-}
 
 foldr1 :: (Foldable f, Eq a) => (Int -> a) -> (a -> a -> a) -> f a -> a
-foldr1 = foldr1By (==) 
+foldr1 = foldr1By (==)
 {-# INLINE foldr1 #-}
 
 foldr1By :: Foldable f => (a -> a -> Bool) -> (Int -> a) -> (a -> a -> a) -> f a -> a
@@ -255,7 +266,7 @@ mapM_ = mapByM_ (==)
 {-# INLINE mapM_ #-}
 
 -- | Map each element of the structure to a monadic action, evaluating these actions
--- from left to right and ignoring the results, while transactional side-effects from 
+-- from left to right and ignoring the results, while transactional side-effects from
 -- mis-speculated actions are rolled back.
 mapSTM_ :: Foldable t => STM Bool -> (Int -> STM c) -> (a -> STM b) -> t a -> STM ()
 mapSTM_ chk g f = foldrBySTM (\_ _ -> chk) (\n -> () <$ g n) (\a _ -> () <$ f a) (return ())
@@ -288,7 +299,7 @@ sequenceByA_ cmp g = foldrBy cmp ((()<$) . g) (*>) (pure ())
 {-# INLINE sequenceByA_ #-}
 
 sequence_ :: (Foldable t, Monad m, Eq (m ())) => (Int -> m b) -> t (m a) -> m ()
-sequence_ = sequenceBy_ (==) 
+sequence_ = sequenceBy_ (==)
 {-# INLINE sequence_ #-}
 
 sequenceSTM_:: Foldable t => STM Bool -> (Int -> STM a) -> t (STM b) -> STM ()
@@ -308,11 +319,11 @@ asumBy cmp g = foldrBy cmp g (<|>) empty
 {-# INLINE asumBy #-}
 
 msum  :: (Foldable t, MonadPlus m, Eq (m a)) => (Int -> m a) -> t (m a) -> m a
-msum = msumBy (==) 
+msum = msumBy (==)
 {-# INLINE msum #-}
 
 msumBy  :: (Foldable t, MonadPlus m) => (m a -> m a -> Bool) -> (Int -> m a) -> t (m a) -> m a
-msumBy cmp g = foldrBy cmp g mplus mzero 
+msumBy cmp g = foldrBy cmp g mplus mzero
 {-# INLINE msumBy #-}
 
 toList :: (Foldable t, Eq a) => (Int -> [a]) -> t a -> [a]
@@ -378,26 +389,26 @@ maximum g = foldr1 g max
 -- TODO: allow for patching?
 maximumBy :: Foldable t => (a -> a -> Ordering) -> (Int -> a) -> t a -> a
 maximumBy cmp g = foldr1By cmp' g max'
-  where 
-    max' x y = case cmp x y of 
-        GT -> x 
+  where
+    max' x y = case cmp x y of
+        GT -> x
         _  -> y
     cmp' x y = cmp x y == EQ
 {-# INLINE maximumBy #-}
-        
+
 minimum :: (Foldable t, Ord a) => (Int -> a) -> t a -> a
 minimum g = foldr1 g min
 {-# INLINE minimum #-}
 
 minimumBy :: Foldable t => (a -> a -> Ordering) -> (Int -> a) -> t a -> a
 minimumBy cmp g = foldr1By cmp' g min'
-  where 
-    min' x y = case cmp x y of 
-        GT -> x 
+  where
+    min' x y = case cmp x y of
+        GT -> x
         _  -> y
     cmp' x y = cmp x y == EQ
 {-# INLINE minimumBy #-}
-        
+
 elem :: (Foldable t, Eq a) => (Int -> Bool) -> a -> t a -> Bool
 elem g = any g . (==)
 {-# INLINE elem #-}
@@ -415,8 +426,8 @@ notElemBy cmp g a = not . elemBy cmp g a
 {-# INLINE notElemBy #-}
 
 find :: (Foldable t, Eq a) => (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a
-find = findBy (==) 
+find = findBy (==)
 
-findBy :: Foldable t => (Maybe a -> Maybe a -> Bool) -> (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a 
+findBy :: Foldable t => (Maybe a -> Maybe a -> Bool) -> (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a
 findBy cmp g p = getFirst . foldMapBy (on cmp getFirst) (First . g) (\x -> First (if p x then Just x else Nothing))
 

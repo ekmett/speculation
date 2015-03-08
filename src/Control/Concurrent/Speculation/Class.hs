@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent.Speculation.Class
--- Copyright   :  (C) 2011 Edward Kmett, Jake McArthur
+-- Copyright   :  (C) 2011-2015 Edward Kmett, Jake McArthur
 -- License     :  BSD-style (see the file LICENSE)
 --
 -- Maintainer  :  Edward Kmett <ekmett@gmail.com>

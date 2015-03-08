@@ -1,6 +1,7 @@
 /1.5.0.2/
 
  * Build warning-free on GHC 7.10+
+ * Added an HLint configuration
 
 /1.5/
 

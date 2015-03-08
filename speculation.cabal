@@ -78,6 +78,7 @@ flag optimize
 
 library
   ghc-options: -Wall
+  hs-source-dirs: src
   if flag(optimize)
     ghc-options: -funbox-strict-fields -O2 -fspec-constr -fdicts-cheap
 

@@ -203,7 +203,7 @@ instance Applicative (IntAccumR s) where
 -- applicative composition with a strict integer state applicative
 newtype AccT m a = AccT (Int# -> Acc (m a))
 
-runAccT :: Applicative m => AccT m a -> Int -> m a
+runAccT :: AccT m a -> Int -> m a
 runAccT (AccT m) (I# i) = extractAcc (m i)
 {-# INLINE runAccT #-}
 

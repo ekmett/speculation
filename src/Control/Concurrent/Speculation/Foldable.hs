@@ -418,5 +418,5 @@ find :: (Foldable t, Eq a) => (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a
 find = findBy (==) 
 
 findBy :: Foldable t => (Maybe a -> Maybe a -> Bool) -> (Int -> Maybe a) -> (a -> Bool) -> t a -> Maybe a 
-findBy cmp g p = getFirst . foldMapBy (on cmp getFirst) (First . g) (\x -> if p x then First (Just x) else First Nothing)
+findBy cmp g p = getFirst . foldMapBy (on cmp getFirst) (First . g) (\x -> First (if p x then Just x else Nothing))
 

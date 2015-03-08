@@ -45,7 +45,7 @@
 <a name="line-36"></a>
 <a name="line-37"></a><span class='hs-comment'>-- * Basic speculation</span>
 <a name="line-38"></a>
-<a name="line-39"></a><a name="instance%20MonadSpec%20(ContT%20r%20m)"></a><span class='hs-keyword'>instance</span> <span class='hs-conid'>Monad</span> <span class='hs-varid'>m</span> <span class='hs-keyglyph'>=&gt;</span> <span class='hs-conid'>MonadSpec</span> <span class='hs-layout'>(</span><span class='hs-conid'>ContT</span> <span class='hs-varid'>r</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
+<a name="line-39"></a><a name="instance%20MonadSpec%20(ContT%20r%20m)"></a><span class='hs-keyword'>instance</span> <span class='hs-conid'>MonadSpec</span> <span class='hs-layout'>(</span><span class='hs-conid'>ContT</span> <span class='hs-varid'>r</span> <span class='hs-varid'>m</span><span class='hs-layout'>)</span> <span class='hs-keyword'>where</span>
 <a name="line-40"></a>  <span class='hs-varid'>specByM</span> <span class='hs-varid'>f</span> <span class='hs-varid'>g</span> <span class='hs-varid'>a</span> <span class='hs-keyglyph'>=</span> <span class='hs-conid'>ContT</span> <span class='hs-varop'>$</span> <span class='hs-keyglyph'>\</span><span class='hs-varid'>k</span> <span class='hs-keyglyph'>-&gt;</span> <span class='hs-varid'>specBy</span> <span class='hs-varid'>f</span> <span class='hs-varid'>g</span> <span class='hs-varid'>k</span> <span class='hs-varid'>a</span>
 </pre></body>
 </html>

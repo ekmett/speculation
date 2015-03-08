@@ -36,5 +36,5 @@ specOnM = specByM . on (==)
 
 -- * Basic speculation
 
-instance Monad m => MonadSpec (ContT r m) where
+instance MonadSpec (ContT r m) where
   specByM f g a = ContT $ \k -> specBy f g k a

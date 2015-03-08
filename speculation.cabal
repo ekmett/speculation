@@ -9,7 +9,7 @@ homepage:       http://github.com/ekmett/speculation
 bug-reports:    http://github.com/ekmett/speculation/issues
 category:       Concurrency
 copyright:      (c) 2010-2013 Edward A. Kmett
-build-type:     Custom
+build-type:     Simple
 cabal-version:  >=1.6
 tested-with:    GHC==6.12.1, GHC==7.3.20111017, GHC==7.4.1, GHC==7.6.3, GHC==7.7
 synopsis:       A framework for safe, programmable, speculative parallelism

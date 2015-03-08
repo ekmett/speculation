@@ -294,7 +294,7 @@ sequenceA_ :: (Foldable t, Applicative f, Eq (f ())) => (Int -> f b) -> t (f a) 
 sequenceA_ = sequenceByA_ (==)
 {-# INLINE sequenceA_ #-}
 
-sequenceByA_ :: (Foldable t, Applicative f, Eq (f ())) => (f () -> f () -> Bool) -> (Int -> f b) -> t (f a) -> f ()
+sequenceByA_ :: (Foldable t, Applicative f) => (f () -> f () -> Bool) -> (Int -> f b) -> t (f a) -> f ()
 sequenceByA_ cmp g = foldrBy cmp ((()<$) . g) (*>) (pure ())
 {-# INLINE sequenceByA_ #-}
 

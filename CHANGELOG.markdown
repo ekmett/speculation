@@ -2,6 +2,7 @@
 
  * Build warning-free on GHC 7.10+
  * Added an HLint configuration
+ * Removed a redundant constraint from the type of `sequenceByA_`.
 
 /1.5/
 

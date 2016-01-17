@@ -1,3 +1,8 @@
+/1.5.0.3/
+
+ * Support GHC 8
+ * Support `transformers` 0.5
+
 /1.5.0.2/
 
  * Build warning-free on GHC 7.10+

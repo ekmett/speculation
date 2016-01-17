@@ -86,8 +86,8 @@ library
 
   build-depends:
     ghc-prim,
-    transformers >= 0.2.2.0 && < 0.5,
-    stm          >= 2.1 && < 2.5
+    stm >= 2.1 && < 2.5,
+    transformers >= 0.2.2.0 && < 0.6
 
   exposed-modules:
     Control.Concurrent.Speculation
@@ -97,4 +97,3 @@ library
     Control.Concurrent.Speculation.List
   other-modules:
     Control.Concurrent.Speculation.Internal
-

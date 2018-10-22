@@ -11,7 +11,16 @@ category:       Concurrency
 copyright:      (c) 2010-2015 Edward A. Kmett
 build-type:     Simple
 cabal-version:  >=1.6
-tested-with:    GHC==6.12.1, GHC==7.3.20111017, GHC==7.4.2, GHC==7.6.3, GHC==7.7, GHC==7.8.4, GHC==7.10.0.20150307
+tested-with:    GHC == 7.0.4
+              , GHC == 7.2.2
+              , GHC == 7.4.2
+              , GHC == 7.6.3
+              , GHC == 7.8.4
+              , GHC == 7.10.3
+              , GHC == 8.0.2
+              , GHC == 8.2.2
+              , GHC == 8.4.1
+              , GHC == 8.6.1
 synopsis:       A framework for safe, programmable, speculative parallelism
 description:
  A framework for safe, programmable, speculative parallelism, loosely based on:
@@ -86,7 +95,7 @@ library
 
   build-depends:
     ghc-prim,
-    stm >= 2.1 && < 2.5,
+    stm >= 2.1 && < 2.6,
     transformers >= 0.2.2.0 && < 0.6
 
   exposed-modules:
